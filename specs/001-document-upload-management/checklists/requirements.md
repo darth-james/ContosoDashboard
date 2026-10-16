@@ -1,0 +1,41 @@
+# Specification Quality Checklist: Document Upload and Management
+
+**Purpose**: Validate specification completeness and quality before proceeding to planning
+**Created**: 2026-10-16
+**Feature**: [spec.md](../spec.md)
+
+## Content Quality
+
+- [x] No implementation details (languages, frameworks, APIs)
+- [x] Focused on user value and business needs
+- [x] Written for non-technical stakeholders
+- [x] All mandatory sections completed
+
+## Requirement Completeness
+
+- [x] No [NEEDS CLARIFICATION] markers remain
+- [x] Requirements are testable and unambiguous
+- [x] Success criteria are measurable
+- [x] Success criteria are technology-agnostic (no implementation details)
+- [x] All acceptance scenarios are defined
+- [x] Edge cases are identified
+- [x] Scope is clearly bounded
+- [x] Dependencies and assumptions identified
+
+## Feature Readiness
+
+- [x] All functional requirements have clear acceptance criteria
+- [x] User scenarios cover primary flows
+- [x] Feature meets measurable outcomes defined in Success Criteria
+- [x] No implementation details leak into specification
+
+## Notes
+
+- **Iteration 1, issues found and fixed**:
+  - The Permissions table contradicted the hierarchical roles defined in the constitution (Employee < Team Lead < Project Manager < Administrator). The Project Manager column did not inherit the Team Lead permissions for team documents. Fixed.
+  - User Story 2, scenario 3 did not account for Administrators, who can upload to any project. Fixed.
+  - The Assumptions section named a specific UI framework. Changed to a neutral term.
+- **Iteration 2**: All items pass.
+- **Implementation guidance**: The stakeholder document's technical guidance (storage interface, write ordering, identifier and column types, UI upload patterns) is deliberately left out of the spec. It is carried into `/speckit.plan` under the constitution (Principles I–IV).
+- **Constitution alignment**: The spec includes a per-role Permissions table and a negative authorization requirement (SC-006). Offline operation (FR-038), portable storage references (FR-039), the file-then-record write order (FR-011), and the out-of-scope items (Principle V) are all covered.
+- **Informed defaults to confirm** (no markers were raised): team = department; "manage" excludes replacing and sharing; offline malware scan that rejects uploads when a scan can't be completed; the dashboard count includes only the user's own uploads. Review these with `/speckit.clarify` if stakeholders disagree.
