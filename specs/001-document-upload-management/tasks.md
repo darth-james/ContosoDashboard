@@ -16,7 +16,7 @@ description: "Task list for Document Upload and Management"
 - Malware-scan rejection using **in-memory** EICAR bytes (FR-008)
 - Timing for 500-document lists and search (SC-002, SC-003), a 25 MB upload (SC-001), and opening a preview (SC-004)
 
-**Stub-first rule (mandatory, constitution build gate)**: before writing a story's tests, add the interface and service members those tests call, with `throw new NotImplementedException()` bodies, so the solution builds. Each phase has an explicit stub task for this, listed first in its Tests section (T132 for Foundational, then one per story). The new tests then fail **at runtime** (red), never at compile time. A test task is done only when the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`, which also builds `ContosoDashboard`) with no new errors or warnings, and its new tests fail at runtime. The implementation tasks then replace the stub bodies and turn the tests green.
+**Stub-first rule (mandatory, constitution build gate)**: before writing a story's tests, add the interface and service members those tests call, with `throw new NotImplementedException()` bodies, so the solution builds. Each phase has an explicit stub task for this, listed first in its Tests section (T132 for Foundational, then one per story). Tests that call stubbed members then fail **at runtime** (red), never at compile time. Tests that exercise behavior already implemented by earlier tasks or stories (for example visibility rules, finished US4 methods, or unsupported-type checks) may pass as soon as they are written; that is expected and does not block the task. A test task is done only when the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`, which also builds `ContosoDashboard`) with no new errors or warnings, and every new test that calls a stubbed member fails at runtime. The implementation tasks then replace the stub bodies and turn the tests green.
 
 **Story traits**: every test method carries `[Trait("Story", "<id>")]`, where `<id>` is `Foundation`, `US1`–`US9`, or `Polish`. Put the trait on each **method** (not the class) in classes that span stories: the partial classes `DocumentAuthorizationMatrixTests` and `DocumentWriteOrderTests`, and `DocumentPerformanceTests` (extended in Polish). A class-level trait is fine for single-story classes. Verification tasks filter by trait (`dotnet test ContosoDashboard.Tests --filter "Story=US2"`). They run the story's own trait plus `Foundation` and the traits of the story's hard dependencies, so red tests of a story still in progress never block the verification of another story. Only T130 runs the unfiltered suite.
 
@@ -193,7 +193,7 @@ description: "Task list for Document Upload and Management"
 
   Share, task, and report records go in their own service files later.
 
-### 2c. Test harness and foundational tests (write first; they must fail at runtime before 2d)
+### 2c. Test harness and foundational tests (write first; stub-dependent tests fail at runtime before 2d)
 
 - [ ] T132 Add compile-only stubs under `ContosoDashboard\Services\` for every 2d member that the 2c tests call, so the solution builds before any test is written (stub-first rule). Every method body is `throw new NotImplementedException()`; constants and records are real.
   - `ContosoDashboard\Services\LocalFileStorageService.cs`: `DocumentStorageOptions` (real) and `LocalFileStorageService : IFileStorageService` with its constructors and stubbed members
@@ -248,13 +248,13 @@ description: "Task list for Document Upload and Management"
   - `DownloadAsync` on a missing key throws `FileNotFoundException`.
   - `GetUrlAsync` throws `NotSupportedException`.
   - The resolved root is never under `wwwroot`.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
 - [ ] T027 [P] Write `ContosoDashboard.Tests\SimulatedEicarMalwareScannerTests.cs`, using `EicarTestBytes` in a `MemoryStream`:
   - Canonical bytes and bytes with a leading line both return `Infected`.
   - Ordinary text and PNG-like bytes return `Clean`.
   - `Position` is restored to its pre-scan value after every scan.
   - A signature split across the scanner's internal read-buffer boundary is still detected.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
 - [ ] T028 [P] Write `ContosoDashboard.Tests\DocumentFileRulesTests.cs`:
   - **Size**: 26,214,400 bytes is accepted, 26,214,401 is rejected, and 0 is rejected.
   - **Extensions**: `.PDF` is accepted (case-insensitive). `report.pdf.exe`, `bundle.zip`, `tool.exe`, and a name with no extension are rejected.
@@ -270,7 +270,7 @@ description: "Task list for Document Upload and Management"
     - Category must be in `DocumentCategories.All`.
     - Tags are trimmed, empty tags are dropped, duplicates are removed (`OrdinalIgnoreCase`), there are at most 10, and each is ≤ 50 characters.
   - **Display names**: `GetDisplayName(mime)` returns "PDF", "Word", "Excel", "PowerPoint", "Text", "JPEG", or "PNG".
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
 - [ ] T029 [P] Write `ContosoDashboard.Tests\DocumentAccessPolicyTests.cs` (LocalDb collection). Use `DocumentTestData` and run each predicate **as an EF query** against LocalDB, so a client-evaluation exception fails the test. Assert the R-02 truths for `CanAccess`, `CanManage`, `IsOwner`, and `CanUploadToProject`:
   - **Owner**: the uploader can access and manage their own document.
   - **Project**: a member of the document's project and that project's manager can access it.
@@ -280,9 +280,9 @@ description: "Task list for Document Upload and Management"
   - **Administrator** can access and manage everything.
   - **Upload to a project**: allowed for a project member or the project manager, or for any project if the requester is an Administrator.
   - **Unknown user**: `LoadUserContextAsync` for a nonexistent user returns null.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
 - [ ] T030 [P] Write `ContosoDashboard.Tests\NotificationServiceTests.cs`. `CreateNotificationsAsync` inserts all notifications in one save, returns the inserted count, and **skips** recipients whose `InAppNotificationsEnabled == false` (FR-028). It persists `DocumentId` and the new `NotificationType` values. The existing `CreateNotificationAsync` behavior is unchanged.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
 
 ### 2d. Foundational implementation
 
@@ -348,7 +348,7 @@ description: "Task list for Document Upload and Management"
 
 As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Document not found or not available." and a 404 identical to `/documents/999999/download`.
 
-### Tests for User Story 1 ⚠️ (stubs first, then tests; they must fail at runtime)
+### Tests for User Story 1 ⚠️ (stubs first, then tests; stub-dependent tests fail at runtime)
 
 - [ ] T133 [US1] Create `ContosoDashboard\Services\DocumentService.cs` with compile-only stubs (stub-first rule):
   - **Interface** `IDocumentService` with the US1 members from contracts\service-interfaces.md: `UploadDocumentAsync`, `GetUploadableProjectsAsync`, `GetMyDocumentsAsync`, `GetDocumentAsync`, and `OpenDocumentContentAsync`
@@ -386,7 +386,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Tags**: `"Onboarding, onboarding ,  "` is stored as one tag.
   - **Boundary**: exactly 26,214,400 bytes is accepted.
   - **Download**: `OpenDocumentContentAsync(id, 4, Download)` returns identical bytes, `DownloadFileName` = the original name, `Inline = false`, the stored MIME, and writes one Download activity.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US1")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US1")]` on the class or each method.
 - [ ] T043 [P] [US1] Write `ContosoDashboard.Tests\DocumentWriteOrderTests.cs` (LocalDb collection; partial class, so US4 adds a second file). For each rejection, assert the specific error code, **zero new files** under the fixture storage root, **zero new `Documents` rows**, and no Upload activity (SC-007, FR-011):
   - **Size and type**: 26,214,401 bytes → `FileTooLarge`; 0 bytes → `FileEmpty`; `.exe`, `.zip`, `report.pdf.exe`, and no extension → `UnsupportedFileType`.
   - **EICAR**: `EicarTestBytes.WithLeadingLine()` as `eicar-test.txt` → `MalwareDetected`, and the scanner ran **before** any `UploadAsync` call (`RecordingFileStorageService` has no Upload).
@@ -394,7 +394,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Storage failure** (`FailingFileStorageService`) → `StorageFailed`, and no row.
   - **Save failure** (armed `ThrowingSaveChangesInterceptor`) → `StorageFailed`, the file written in step 5 has been **deleted** (compensation), and no row exists.
   - **Ordering**: on success, `UploadAsync` completed before the row became visible.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US1")]` on each test method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US1")]` on each test method.
 - [ ] T044 [P] [US1] Write `ContosoDashboard.Tests\DocumentAuthorizationMatrixTests.OwnDocuments.cs` (partial class). Every denial case:
   - **Same-department Employee**: Dana (5) calling `GetDocumentAsync` on Ni Kang's personal document → `null`.
   - **Same response as nonexistent**: `OpenDocumentContentAsync` in Download mode for Dana → `NotFound`, the **same** result shape and message as for document 999999.
@@ -405,12 +405,12 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Uploadable projects**: `GetUploadableProjectsAsync` returns only P1 for Ni Kang, only P2 for Mateo, and P1 and P2 for Admin.
   - **Owner flags**: the owner's `GetDocumentAsync` flags are `CanEditMetadata = CanDelete = CanReplaceFile = CanShare = true`.
   - Update the header comment table (T024) for the cells "Access a document (Employee)" and "Upload a document to a project (Employee)".
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US1")]` on each test method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US1")]` on each test method.
 - [ ] T134 [P] [US1] Write `ContosoDashboard.Tests\DocumentUploadTimingTests.cs` (its own `IClassFixture<LocalDbFixture>`, so it gets a separate database) for SC-001, using the real `LocalFileStorageService` and `SimulatedEicarMalwareScanner` from `TestServiceFactory`:
   - **Warm-up**: one small personal upload first, not timed.
   - **Arrange**: a `MemoryStream` of exactly 26,214,400 bytes named `big.pdf` (a `%PDF-1.4` header followed by filler bytes; no EICAR content).
   - **Assert** (`Stopwatch` around `UploadDocumentAsync` as Ni Kang): the call succeeds and completes in **≤ 30 s** on localhost (SC-001). This measures validation, scanning, storage, and the save; the browser-to-server transfer is checked by hand in quickstart.md §1 step 3.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US1")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US1")]` on the class or each method.
 
 ### Implementation for User Story 1
 
@@ -518,7 +518,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
 - Mateo (not on P1) and Rafael (PM of P2) get "not found" and a 404 for D3.
 - P2 is never offered to Ni Kang.
 
-### Tests for User Story 2 ⚠️ (stubs first, then tests; they must fail at runtime)
+### Tests for User Story 2 ⚠️ (stubs first, then tests; stub-dependent tests fail at runtime)
 
 - [ ] T135 [US2] Add `GetProjectDocumentsAsync(int projectId, int requestingUserId, DocumentQuery query)` to `IDocumentService` and a `throw new NotImplementedException()` body to `DocumentService` in `ContosoDashboard\Services\DocumentService.cs` (stub-first rule). **Done when** `dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj` succeeds with no new errors or warnings.
 - [ ] T057 [P] [US2] Write `ContosoDashboard.Tests\DocumentAuthorizationMatrixTests.ProjectDocuments.cs` (partial class). Arrange the data with `DocumentTestData`.
@@ -535,14 +535,14 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
     - Keeps access to their own upload.
   - **Admin upload**: an Admin uploading to P2 is allowed.
   - Update the header table for "Access a document (Project Manager)" and "Upload a document to a project".
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US2")]` on each test method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US2")]` on each test method.
 - [ ] T058 [P] [US2] Write `ContosoDashboard.Tests\ProjectDocumentNotificationTests.cs` (LocalDb collection):
   - **Recipients**: after Ni Kang uploads to P1, `Notifications` contains exactly one `DocumentAdded` row for each of Floris (3) and Camille (2), and none for Ni Kang (4).
   - **Content**: each row has `DocumentId` set, and `Title` = "New project document" with a message that names the document title and "ContosoDashboard Development".
   - **Preference**: a recipient with `InAppNotificationsEnabled = false` gets nothing.
   - **Personal uploads** create no notifications.
   - **Failure isolation**: a notification failure doesn't roll back the upload. Arrange this with a recipient query that fails, or a subclassed `INotificationService` that throws, and assert that the document row still exists.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US2")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US2")]` on the class or each method.
 
 ### Implementation for User Story 2
 
@@ -574,7 +574,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
 - As Dana, searching "onboarding" returns neither Ni Kang's P1 document nor Mateo's personal document.
 - PDF and PNG previews render inline. Requesting a preview of a `.docx` redirects to its details page.
 
-### Tests for User Story 3 ⚠️ (stubs first, then tests; they must fail at runtime)
+### Tests for User Story 3 ⚠️ (stubs first, then tests; stub-dependent tests fail at runtime)
 
 - [ ] T136 [US3] Add `SearchDocumentsAsync(int requestingUserId, string searchText, DocumentQuery query)` to `IDocumentService` and a `throw new NotImplementedException()` body to `DocumentService` in `ContosoDashboard\Services\DocumentService.cs` (stub-first rule). Preview mode already returns `UnsupportedFileType` (T048), so the preview tests compile and fail at runtime without another stub. **Done when** `dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj` succeeds with no new errors or warnings.
 - [ ] T064 [P] [US3] Write `ContosoDashboard.Tests\DocumentSearchAndQueryTests.cs` (LocalDb collection). Use unique per-test title prefixes, and arrange the data with `DocumentTestData`.
@@ -585,13 +585,13 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Sorting**: `GetMyDocumentsAsync` with each `DocumentSortField` × {ascending, descending} orders correctly, with a stable tie-break on `DocumentId`.
   - **Filters**: `Category`, `ProjectId`, and `FromDate`/`ToDate` (inclusive UTC days), alone and combined, return only documents that match all of them.
   - **Paging**: `PageSize` 0 is clamped to 1, and 500 is clamped to 100.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US3")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US3")]` on the class or each method.
 - [ ] T065 [P] [US3] Write `ContosoDashboard.Tests\DocumentPreviewTests.cs` (LocalDb collection):
   - **Previewable types**: `OpenDocumentContentAsync(id, owner, Preview)` for a PDF, a JPEG, and a PNG returns `Inline = true` with the **stored** canonical MIME, and writes one Preview activity.
   - **Non-previewable types**: for `.docx` and `.txt`, it returns `UnsupportedFileType` and writes **no** activity.
   - **No access**: Preview by a user without access → `NotFound`.
   - **Stored MIME wins**: a PNG whose client-reported type was `text/html` is still served as `image/png`.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US3")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US3")]` on the class or each method.
 - [ ] T066 [P] [US3] Write `ContosoDashboard.Tests\DocumentPerformanceTests.cs` (its own `IClassFixture<LocalDbFixture>`, so it gets a separate database):
   - **Seed**: `DocumentTestData.SeedBulkDocumentsAsync` creates 500 documents accessible to one user (a mix of owned, P1, and shared), with tags.
   - **Warm-up**: run each query once before timing.
@@ -599,7 +599,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
     - `SearchDocumentsAsync` for a common tag term and for an uploader name each completes in **< 2 s** and returns the expected `TotalCount` (SC-003).
     - `GetMyDocumentsAsync`, sorted by Title and filtered by category and date range, completes in **< 2 s** (SC-002).
   - **Preview timing (SC-004)**: arrange a PDF-like file of 10,000,000 bytes (under 10 MB) with `DocumentTestData.AddDocumentAsync(..., fileType: "application/pdf", bytes)`. After a warm-up call, time `OpenDocumentContentAsync(id, owner, Preview)` **plus** reading the returned stream to the end. It succeeds with `Inline = true` and completes in **≤ 3 s** on localhost. Rendering in the browser is checked by hand in quickstart.md §3 step 4.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US3")]` on each test method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US3")]` on each test method.
 
 ### Implementation for User Story 3
 
@@ -664,7 +664,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - Floris can't edit or delete Camille's P1 document.
   - Camille can edit and delete Ni Kang's D3, but can't replace it.
 
-### Tests for User Story 4 ⚠️ (stubs first, then tests; they must fail at runtime)
+### Tests for User Story 4 ⚠️ (stubs first, then tests; stub-dependent tests fail at runtime)
 
 - [ ] T137 [US4] Add `UpdateMetadataAsync`, `ReplaceFileAsync`, and `DeleteDocumentAsync` (signatures from contracts\service-interfaces.md) to `IDocumentService`, with `throw new NotImplementedException()` bodies in `DocumentService` in `ContosoDashboard\Services\DocumentService.cs` (stub-first rule). **Done when** `dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj` succeeds with no new errors or warnings.
 - [ ] T077 [P] [US4] Write `ContosoDashboard.Tests\DocumentWriteOrderTests.ReplaceDelete.cs` (partial class from T043):
@@ -674,7 +674,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Delete**: `DeleteDocumentAsync` removes the row, along with its tags, shares, and task attachments through the cascade. It then deletes the file and keeps a Delete activity whose `DocumentId` and `DocumentTitle` snapshot are still queryable.
   - **Delete when file removal fails** (`FailingFileStorageService.DeleteAsync` throws): the record is still deleted and the call succeeds. The leftover file is only logged and is never served, because no record refers to it (spec FR-011's accepted training limitation).
   - **Replace when old-file removal fails** (`FailingFileStorageService.DeleteAsync` throws after a successful replace): the call succeeds, the record points at the new file, and downloads return the new content.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US4")]` on each test method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US4")]` on each test method.
 - [ ] T078 [P] [US4] Write `ContosoDashboard.Tests\DocumentAuthorizationMatrixTests.Management.cs` (partial class). For each case, assert both the service result and the `GetDocumentAsync` flags:
   - **Employee, not the owner, document accessible**: Ni Kang (4) on Floris's P1 document → `UpdateMetadataAsync`, `DeleteDocumentAsync`, and `ReplaceFileAsync` are all `Forbidden`.
   - **Team Lead on a PM's document**: Floris (3) on Camille's P1 document (Camille isn't an Employee) → Update and Delete are `Forbidden`.
@@ -684,7 +684,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **No access**: Dana (5) on Ni Kang's personal document → `NotFound` for all three operations.
   - **Nonexistent document** (ID 999999) → `NotFound`.
   - Update the header table for the Edit metadata, Replace file, and Delete rows.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US4")]` on each test method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US4")]` on each test method.
 - [ ] T079 [P] [US4] Write `ContosoDashboard.Tests\DocumentMetadataUpdateTests.cs`. For `UpdateMetadataAsync`:
   - **Validation**: the same rules as upload apply (title 1–200, category in the list, description ≤ 2,000, ≤ 10 tags of ≤ 50 characters), each returning `Validation`.
   - **Tags**: tags are **replaced as a set**. Removed tags are deleted, new tags are added, and duplicates that differ only in case collapse.
@@ -692,7 +692,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Timestamp**: `LastModifiedDate` advances.
   - **Activity**: one MetadataEdit activity is written, with a change summary in `Details` (for example "Category: Reports → Other").
   - **Concurrency**: last write wins (two sequential updates from different managers leave the second one's values).
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US4")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US4")]` on the class or each method.
 
 ### Implementation for User Story 4
 
@@ -743,7 +743,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
 - Sharing with Engineering doesn't notify Ni Kang.
 - Dana (a recipient) and the Admin (not the owner) can't share D4.
 
-### Tests for User Story 5 ⚠️ (stubs first, then tests; they must fail at runtime)
+### Tests for User Story 5 ⚠️ (stubs first, then tests; stub-dependent tests fail at runtime)
 
 - [ ] T138 [US5] Add compile-only stubs in `ContosoDashboard\Services\DocumentShareService.cs` and `ContosoDashboard\Services\DocumentService.cs` (stub-first rule):
   - Create `ContosoDashboard\Services\DocumentShareService.cs` with the records `ShareTargets`, `ShareUserOption`, and `DocumentShareInfo` (real), the interface `IDocumentShareService` (from contracts\service-interfaces.md), and the class `DocumentShareService` with its constructor (`ApplicationDbContext`, `INotificationService`, `ILogger<DocumentShareService>`) and every member body `throw new NotImplementedException()`.
@@ -766,13 +766,13 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Live department membership**: a throwaway user who **joins** Marketing after the share gains access; one who **leaves** loses it.
   - **Shared with Me excludes own uploads**: `GetSharedWithMeAsync` excludes documents the requester uploaded.
   - **Share targets**: `GetShareTargetsAsync` lists all users except the owner, plus the distinct non-empty departments.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US5")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US5")]` on the class or each method.
 - [ ] T088 [P] [US5] Write `ContosoDashboard.Tests\DocumentAuthorizationMatrixTests.Sharing.cs` (partial class):
   - **Non-owners can't share or manage shares**: for Dana (a recipient), Camille (PM of the document's project), Floris (Team Lead with oversight), and Admin (1), each of `ShareWithUsersAsync`, `ShareWithDepartmentsAsync`, `RemoveShareAsync`, `GetSharesAsync`, and `GetShareTargetsAsync` → `Forbidden` (or `null` for the getters). If the user can't access the document at all → `NotFound`.
   - **Recipient flags**: a recipient's `GetDocumentAsync` returns the document with `CanEditMetadata`, `CanDelete`, `CanReplaceFile`, and `CanShare` all false (FR-023). The service-level recipient denials for `UpdateMetadataAsync`, `DeleteDocumentAsync`, and `ReplaceFileAsync` call US4 members, so they're in T126 (Polish), which keeps US5 dependent only on US1.
   - **Bystander denial**: a user who is neither a recipient nor otherwise authorized → `NotFound`.
   - Update the header table for the "Share or remove shares" row.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US5")]` on each test method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US5")]` on each test method.
 
 ### Implementation for User Story 5
 
@@ -820,7 +820,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
 - **Removal**: removing D4 from task 2 leaves it on P1, and TaskAttach and TaskDetach entries exist.
 - **Task not visible**: Mateo sees "Task not found or not available." for `/tasks/2`.
 
-### Tests for User Story 6 ⚠️ (stubs first, then tests; they must fail at runtime)
+### Tests for User Story 6 ⚠️ (stubs first, then tests; stub-dependent tests fail at runtime)
 
 - [ ] T139 [US6] Create `ContosoDashboard\Services\TaskDocumentService.cs` with compile-only stubs (stub-first rule): the record `TaskDocumentInfo` (real), the interface `ITaskDocumentService` from contracts\service-interfaces.md (`GetTaskDocumentsAsync`, `CanAddDocumentsAsync`, `GetAttachableDocumentsAsync`, `AttachDocumentAsync`, `DetachDocumentAsync`), and the class `TaskDocumentService` with its constructor (`ApplicationDbContext`, `ITaskService`, `INotificationService`, `ILogger<TaskDocumentService>`) and every member body `throw new NotImplementedException()`. Upload with `TaskId` already returns `Validation` (T046), so the upload-from-task tests compile and fail at runtime. **Done when** `dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj` succeeds with no new errors or warnings.
 - [ ] T096 [P] [US6] Add `CreateTaskDocumentService(ApplicationDbContext ctx)` to `ContosoDashboard.Tests\TestServiceFactory.cs`. It returns `TaskDocumentService` with the real `TaskService`, notification service, and `NullLogger`.
@@ -842,7 +842,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Detach by the attacher**: deletes only the link, leaves `ProjectId` unchanged, and writes a TaskDetach activity with `TaskId`.
   - **Attachment list**: `GetTaskDocumentsAsync` hides attachments the viewer can't access and sets `CanDetach` correctly.
   - **Attachable list**: `GetAttachableDocumentsAsync` excludes cross-project documents, no-project documents the requester can't own or manage, and documents already attached. It returns at most 50, and it's **empty** for Dana on the throwaway P1 task (non-member).
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US6")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US6")]` on the class or each method.
 - [ ] T098 [P] [US6] Write `ContosoDashboard.Tests\DocumentAuthorizationMatrixTests.TaskAttachments.cs` (partial class):
   - **Shared no-project document (US6 AS6)**: Ni Kang (Employee) attaching Camille's no-project document that was shared with her, to task 2:
     - Returns `Forbidden`.
@@ -857,7 +857,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
     - Attaching a P1 document she can access through a user share → `Forbidden`, with no `TaskDocument` row.
     - By contrast, Camille (PM of P1) and Ni Kang (P1 member) each attaching **their own** no-project document to that task succeed, which shows the boundary.
   - Update the header table for the "Attach a document to a task" and "Remove a document from a task" rows, including the Employee cell's project-membership limit.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US6")]` on each test method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US6")]` on each test method.
 
 ### Implementation for User Story 6
 
@@ -911,7 +911,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
 - Hana, with no uploads, sees the empty state with an upload link and a count of 0.
 - Documents shared with Dana never appear in her widget.
 
-### Tests for User Story 7 ⚠️ (stubs first, then tests; they must fail at runtime)
+### Tests for User Story 7 ⚠️ (stubs first, then tests; stub-dependent tests fail at runtime)
 
 - [ ] T140 [US7] Add compile-only stubs (stub-first rule): `GetRecentDocumentsAsync(int requestingUserId, int count = 5)` on `IDocumentService` with a `throw new NotImplementedException()` body in `ContosoDashboard\Services\DocumentService.cs`, and the property `public int TotalDocuments { get; set; }` on `DashboardSummary` in `ContosoDashboard\Services\DashboardService.cs` (not filled yet, so the count test fails at runtime). **Done when** `dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj` succeeds with no new errors or warnings.
 - [ ] T106 [P] [US7] Write `ContosoDashboard.Tests\DashboardDocumentTests.cs` (LocalDb collection; use a throwaway user from `DocumentTestData.AddUserAsync`, so other tests' uploads don't interfere):
@@ -919,7 +919,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Count**: `DashboardService.GetDashboardSummaryAsync(user).TotalDocuments == 6`.
   - **Shared documents don't count**: a document shared **with** the user affects neither the widget nor the count.
   - **Zero uploads**: an empty list and a count of 0.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US7")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US7")]` on the class or each method.
 
 ### Implementation for User Story 7
 
@@ -948,7 +948,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
 - Floris gets "not found" for Mateo's personal document.
 - After Dana moves to Marketing, her documents leave Floris's view and appear in Hana's.
 
-### Tests for User Story 8 ⚠️ (stubs first, then tests; they must fail at runtime)
+### Tests for User Story 8 ⚠️ (stubs first, then tests; stub-dependent tests fail at runtime)
 
 - [ ] T141 [US8] Add `GetTeamDocumentsAsync(int requestingUserId, DocumentQuery query)` and `GetDepartmentsAsync(int requestingUserId)` to `IDocumentService`, with `throw new NotImplementedException()` bodies in `ContosoDashboard\Services\DocumentService.cs` (stub-first rule). **Done when** `dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj` succeeds with no new errors or warnings.
 - [ ] T111 [US8] Write `ContosoDashboard.Tests\DocumentAuthorizationMatrixTests.TeamOversight.cs` (partial class). **Hard dependency: US4 and US5 must be complete**, because these tests call `UpdateMetadataAsync`, `DeleteDocumentAsync`, and `ReplaceFileAsync` (US4) and `ShareWithUsersAsync` (US5). Use **throwaway** users from `DocumentTestData.AddUserAsync` for anything that changes department or role.
@@ -965,13 +965,13 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Department move (US8 AS7)**: move a throwaway Employee from Engineering to Marketing. Floris loses the view and access. Hana gains them for the Employee's **earlier** uploads.
   - **Role change**: promote a throwaway Employee to TeamLead. Their uploads leave Floris's oversight.
   - Update the header table for the "Team Documents view" row and the Team Lead "team members' uploads" cells.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US8")]` on each test method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US8")]` on each test method.
 - [ ] T142 [P] [US8] Write `ContosoDashboard.Tests\DocumentDepartmentsTests.cs` (LocalDb collection) for `GetDepartmentsAsync` (contracts\service-interfaces.md):
   - **Administrator**: returns distinct, non-empty departments ordered by name, including "Engineering" and "Marketing". A throwaway user with an empty department (from `DocumentTestData.AddUserAsync`) adds no empty entry.
   - **Team Lead or PM**: Floris (TeamLead, Engineering) and Camille (ProjectManager, Engineering) each get `["Engineering"]`, and Hana (TeamLead, Marketing) gets `["Marketing"]`.
   - **No department**: a throwaway TeamLead without a department gets an empty list.
   - **Employee and unknown user**: Ni Kang (4) and user 999999 get an empty list.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US8")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US8")]` on the class or each method.
 
 ### Implementation for User Story 8
 
@@ -1013,7 +1013,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
 - Entries for deleted D2 are still present.
 - Rafael gets Access Denied, and the menu item is hidden from him.
 
-### Tests for User Story 9 ⚠️ (stubs first, then tests; they must fail at runtime)
+### Tests for User Story 9 ⚠️ (stubs first, then tests; stub-dependent tests fail at runtime)
 
 - [ ] T144 [US9] Create `ContosoDashboard\Services\DocumentReportService.cs` with compile-only stubs (stub-first rule): the records `DocumentTypeCount`, `UploaderCount`, `DocumentAccessCount`, `DailyAccessCount`, `AccessPatternReport`, and `ActivityLogEntry` (real), the interface `IDocumentReportService` from contracts\service-interfaces.md, and the class `DocumentReportService` with its constructor (`ApplicationDbContext`) and every member body `throw new NotImplementedException()`. **Done when** `dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj` succeeds with no new errors or warnings.
 - [ ] T116 [P] [US9] Add `CreateReportService(ApplicationDbContext ctx)` to `ContosoDashboard.Tests\TestServiceFactory.cs`. It returns `DocumentReportService`.
@@ -1026,7 +1026,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Deleted documents**: rows whose `DocumentId` has no `Documents` row are still reported (US9 AS5).
   - **Invalid range**: `from > to`, or a range over 366 days, gives an empty result.
   - **Non-Administrators**: for each non-Administrator seeded role (Employee 4, TeamLead 3, ProjectManager 2), **every** method returns `null` (US9 AS6). Update the header table for the "Activity records and reports" row.
-  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and the new tests fail at runtime (red), never at compile time, until the implementation tasks replace the stubs. Trait: `[Trait("Story", "US9")]` on the class or each method.
+  - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US9")]` on the class or each method.
 
 ### Implementation for User Story 9
 
@@ -1148,7 +1148,7 @@ These files are touched by several stories, so edits to them must be serialized 
 ### Within Each User Story
 
 - **Stub task first** (T133, T135–T141, T144; T132 for Foundational): add the members the tests call with `throw new NotImplementedException()` bodies, so the solution builds.
-- Then the tests (including test-factory additions). The solution must build, and the new tests must fail **at runtime** (red), never at compile time.
+- Then the tests (including test-factory additions). The solution must build (never a compile error). New tests that call stubbed members fail **at runtime** (red); new tests of behavior that is already implemented may pass.
 - Then service members (replacing the stub bodies), then DI registration, then endpoints and pages, then navigation.
 - Each story ends with a verification task (its `Story` trait, plus `Foundation` and its hard dependencies' traits, and its quickstart section) before you move on. A story's red tests never block another story's verification, because each verification filters by trait.
 
