@@ -73,9 +73,9 @@ No new runtime NuGet packages are needed.
 1. Keep `context.Database.EnsureCreated()`, as the constitution mandates. Add the new `DbSet`s, fluent configuration, and seed data to `ApplicationDbContext`. A fresh database then gets every table, index, check constraint, and seed row automatically.
 2. Add a **Development-only schema guard** to `Program.cs` after `EnsureCreated()`:
    1. Probe for the new schema (for example, `await context.Documents.AnyAsync()` inside `try`/`catch (SqlException)`, or a `sys.tables` lookup for `Documents`).
-   2. If the probe fails and `app.Environment.IsDevelopment()`, log a **warning** ("Database schema predates the Documents feature; recreating training database"), then call `EnsureDeleted()` and `EnsureCreated()`.
-   3. Outside Development, log an **error** with the reset instructions from the README instead, and don't delete anything.
-3. Document both the guard and the manual reset in the README: `sqllocaldb stop mssqllocaldb; sqllocaldb delete mssqllocaldb`, or `dotnet ef database drop --force`. Also document that uploaded files under `AppData/uploads` should be deleted together with the database.
+   2. If the probe fails and `app.Environment.IsDevelopment()`, log a **warning** ("Database schema predates the Documents feature; recreating training database"), then call `EnsureDeleted()` and `EnsureCreated()`. Because the recreated database has no `Documents` rows, the guard then **also clears the uploads folder** (the `DocumentStorage:RootPath` resolved against `ContentRootPath`, by default `ContosoDashboard/AppData/uploads`), only if it exists and resolves inside the content root and outside `wwwroot`, and logs a warning naming the folder. That keeps "one file per `Documents` row" true after an automatic recreate (quickstart §10).
+   3. Outside Development, log an **error** with the reset instructions from the README instead, and don't delete anything (neither the database nor any files).
+3. Document both the guard (including the uploads clean-up) and the manual reset in the README: `sqllocaldb stop mssqllocaldb; sqllocaldb delete mssqllocaldb`, or `dotnet ef database drop --force`. Also document that uploaded files under `AppData/uploads` must be deleted together with the database after a **manual** reset.
 
 **Rationale**:
 
@@ -119,7 +119,7 @@ No new runtime NuGet packages are needed.
 
 - This satisfies Principle IV ("unique path → write file → save metadata") and FR-011.
 - A new key on replace means a failed replacement never corrupts the existing file (spec US4 AS6). Overwriting in place could leave a half-written file.
-- Deleting the record before the file means a failure can only leave an *unreachable* file, never a record pointing at a missing file. An unreachable file is never served, because every read goes through a record.
+- Deleting the record before the file means a failure can only leave an *unreachable* file, never a record pointing at a missing file. An unreachable file is never served, because every read goes through a record. Spec FR-011 accepts this residual case (a failed best-effort cleanup after an upload save failure, a replace, or a delete): the leftover file is logged, never served, and listed as a training limitation in the README.
 
 **Alternatives considered**:
 
@@ -188,7 +188,7 @@ No new runtime NuGet packages are needed.
 
 **Decision**: Build a `Shared/DocumentUploadForm.razor` component with these behaviors:
 
-- `<InputFile multiple @key="inputKey" OnChange="...">` captures the selected files (`e.GetMultipleFiles(maximumFileCount: 10)`).
+- `<InputFile multiple @key="inputKey" OnChange="...">` captures the selected files (`e.GetMultipleFiles(maximumFileCount: 10)`). The 10-file batch limit is part of FR-001. Selecting more makes `GetMultipleFiles` throw `InvalidOperationException`, which the component catches: it adds no rows and shows "You can upload up to 10 files at a time. Select 10 or fewer files."
 - For each file, it first captures `Name`, `Size`, and `ContentType` into a `PendingUpload` row. The row has an editable title (defaulting to the file name without extension, FR-004), category, description, tags, and project.
 - It pre-validates on the client side: extension allow-list, `Size == 0`, and `Size > 26,214,400`. Invalid rows are marked immediately and skipped.
 - On submit, it processes files **sequentially**:
@@ -202,7 +202,8 @@ No new runtime NuGet packages are needed.
 
 **Rationale**:
 
-- This follows the constitution's Blazor rule and the stakeholder pattern: metadata first, then `MemoryStream`, then clear the reference, then reset `@key`.
+- This follows the constitution's Blazor rule and the stakeholder pattern: metadata first, then `MemoryStream`, then clear the reference, then reset `@key`. "Immediately" is interpreted as **at the start of each file's upload processing on submit**, before any other `await` for that file. Between selection and submit, the component holds only the `IBrowserFile` reference and the captured metadata, and opens no stream. The reference stays valid for the circuit until the `@key` reset, which happens only after the batch (recorded in plan.md's Constitution Check).
+- The task page passes `TaskProjectId` with `TaskId` when the task has a project, and the component then hides the project selector, so the form never offers a project the server will override.
 - Sequential processing caps server memory at about one file (≤ 25 MB) per circuit.
 - Chunked copying produces real progress (FR-007).
 - 25 MB over a localhost SignalR connection completes well under 30 s (SC-001).
@@ -336,7 +337,7 @@ No new runtime NuGet packages are needed.
 - **Share notifications**: send to the target user, or to the department's current members, excluding the sharer. No notification goes to a user who already had an identical share (US5 AS6), or to the sharer for a self-share or own-team share.
 - **Project-added notifications**: when a document is newly associated with a project (an upload with a project, or a task attachment that sets the project), send to the project manager and all project members except the actor.
 - **Content**: `Title` = "Document shared with you" or "New project document". `Message` names the document title, the project or sharer, and their display name. Notifications only go to users who can access the document at send time.
-- **`Notifications.razor`**: shows an "Open document" link to `/documents/{DocumentId}` when one is set. The details page re-checks access and shows "Document not found or no longer available" after deletion or revocation.
+- **`Notifications.razor`**: shows an "Open document" link to `/documents/{DocumentId}` when one is set. The details page re-checks access and shows "Document not found or not available." after deletion or revocation. The notification itself keeps the title it was sent with, as a historical record (spec FR-028).
 
 **Rationale**:
 
@@ -401,11 +402,12 @@ No new runtime NuGet packages are needed.
 
 **Decision**: Add `Pages/TaskDetails.razor` at `/tasks/{taskId:int}` with `[Authorize]`.
 
-- It loads the task through `ITaskService.GetTaskByIdAsync(taskId, userId)`, which already authorizes. If that returns `null`, the page shows "Task not found or not available".
+- It loads the task through `ITaskService.GetTaskByIdAsync(taskId, userId)`, which already authorizes. If that returns `null`, the page shows "Task not found or not available."
 - It shows the task fields and an **Attachments** panel. The panel lists attachments through `ITaskDocumentService.GetTaskDocumentsAsync`, filtered to documents the viewer can access (FR-029). It has three actions:
-  - **Upload to task**: `DocumentUploadForm` with `TaskId`.
+  - **Upload to task**: `DocumentUploadForm` with `TaskId` (and `TaskProjectId` when the task has a project).
   - **Attach existing**: a picker of accessible documents from `GetAttachableDocumentsAsync`, which pre-filters by the FR-030 rules.
   - **Remove**: shown only when `CanDetach` is true.
+- Upload and Attach are shown only when `ITaskDocumentService.CanAddDocumentsAsync` is true. For a project task, that requires project membership, the PM role on that project, or Administrator. A non-member assignee or creator sees the attachments and the note "Only members of this task's project can add documents to it." The services refuse a forced attempt with `Forbidden` (FR-030).
 - `Tasks.razor`'s `ViewTaskDetails` TODO navigates to `/tasks/{id}`, and Project Details task rows link there.
 
 **Rationale**: The spec requires a task detail view, and none exists. Reusing `GetTaskByIdAsync` keeps the task-visibility rule in one place.

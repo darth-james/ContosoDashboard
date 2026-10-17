@@ -26,7 +26,7 @@ dotnet build        # must succeed with no new errors or nullable warnings
 dotnet run --launch-profile https
 ```
 
-**Expected**: The app starts at `https://localhost:5001` and creates the database with the new tables and seed data. If you skip the reset and your database predates the feature, the console logs a **warning** that the training database is being recreated (Development schema guard, research R-03). The app then starts normally.
+**Expected**: The app starts at `https://localhost:5001` and creates the database with the new tables and seed data. If you skip the reset and your database predates the feature, the console logs a **warning** that the training database is being recreated (Development schema guard, research R-03), followed by a warning that the `AppData\uploads` folder was cleared. The app then starts normally.
 
 ### 0.2 Seeded users (research R-14)
 
@@ -101,11 +101,12 @@ Sign in as **Ni Kang**.
    - Record the document's ID from its details URL as **D1**.
    - SC-005 counts 3 clicks: Upload, choose file, and Submit.
 2. Download D1. **Expected**: The browser saves `budget.pdf` (original name) with content identical to the source. Compare with `Get-FileHash`.
-3. Upload `exact-25mb.pdf` (title "Boundary", category Other). **Expected**: Accepted (exactly 25 MB). It finishes within 30 s (SC-001).
+3. Upload `exact-25mb.pdf` (title "Boundary", category Other). **Expected**: Accepted (exactly 25 MB). It finishes within 30 s (SC-001). The automated timing test (§11) also measures the 25 MB service upload path against the same limit.
 4. Select `over-25mb.pdf`, `empty.txt`, `tool.exe`, `bundle.zip`, and `report.pdf.exe`. **Expected**: Each is rejected before storage with its specific message (25 MB limit, empty, or supported-types list).
 5. Upload `eicar-test.txt` (category Other). **Expected**: "'eicar-test.txt' was rejected for security reasons."
 6. Clear the title field and the category on a pending file. **Expected**: Submit is blocked, and the required fields are highlighted.
 7. Multi-file: select `notes.txt`, `diagram.png`, and `over-25mb.pdf` together, set categories, and submit. **Expected**: Each file shows its own result: two successes and one rejection. Record `diagram.png` as **D2**.
+   - **Batch limit (FR-001)**: select 11 files at once (for example, `notes.txt` copied 11 times). **Expected**: "You can upload up to 10 files at a time. Select 10 or fewer files." No rows are added, nothing uploads, and the page shows no error screen.
 8. **Storage check**:
 
    ```powershell
@@ -142,7 +143,7 @@ As **Ni Kang**:
 1. Upload two or three more documents with different categories, tags (for example, `onboarding`), and dates. Tag D3 with `onboarding` by editing it.
 2. On My Documents, sort by Title, Upload date, Category, and Size in both directions. Then filter by Category, Project, and a date range, alone and combined. **Expected**: The order and matches are correct (US3 AS1, AS2).
 3. **Search** for `onboarding`, part of a title, a description word, `Ni Kang` (uploader), and `ContosoDashboard` (project name). **Expected**: Matching accessible documents appear within 2 s. A nonsense term shows "No documents found" (AS4, AS7).
-4. **Preview** D1 (PDF) and D2 (PNG). **Expected**: Each opens in a new tab and renders within 3 s (SC-004) without a download. Open `plan.docx` after uploading it. **Expected**: Only Download is offered, and requesting `/documents/{docx}/preview` redirects to the details page (AS6).
+4. **Preview** D1 (PDF) and D2 (PNG). **Expected**: Each opens in a new tab and renders within 3 s (SC-004) without a download. The automated timing test (§11) also measures the preview open path against the same limit. Open `plan.docx` after uploading it. **Expected**: Only Download is offered, and requesting `/documents/{docx}/preview` redirects to the details page (AS6).
 
 **Negative (authorization)**:
 
@@ -200,7 +201,8 @@ As **Ni Kang**:
   2. As **Ni Kang** (a P1 member who can view task 2 but who neither owns D6 nor can manage it), try to attach D6 to task 2.
   - **Expected**: The attachment is refused (D6 isn't offered in the attach picker, and a forced attempt returns "You don't have permission…").
   - **Expected**: D6 still has no project, and **Floris** (P1 member, not a share recipient) still gets "not found" for `/documents/{D6}`.
-- **Task not visible**: As **Mateo Alvarez**, browse to `/tasks/2`. **Expected**: "Task not found or not available", and no attachments are shown.
+- **Task not visible**: As **Mateo Alvarez**, browse to `/tasks/2`. **Expected**: "Task not found or not available.", and no attachments are shown.
+- **Assignee who isn't a project member (AS10, FR-030)**: the seed data has no project task assigned to a non-member, and the UI can't assign one, so the automated tests (§11, T097 and T098) verify it with a throwaway task in P1 assigned to Dana. **Expected** (automated): upload-from-task and attaching her own no-project document both return `Forbidden`, nothing is stored or attached, and the document keeps no project. If you add such a task manually, Dana sees the attachments and the note "Only members of this task's project can add documents to it.", with no Upload or Attach buttons.
 - **Remove an attachment you didn't make (AS9)**:
   1. As **Camille Nicole**, attach one of her own P1 documents to task 2. Record it as **D7**.
   2. As **Ni Kang** (didn't attach D7, and as an Employee can't manage Camille's uploads), open `/tasks/2`.
@@ -217,6 +219,7 @@ As **Ni Kang**:
 
 1. As **Dana Whitfield**, upload one personal document first. Then, as **Floris Kregel**, open **Team Documents**. **Expected**: Lists the uploads by Ni Kang and Dana (Engineering Employees). They can be viewed, edited, and deleted, but Replace and Share are absent (AS1, AS2, AS6).
 2. **Expected**: Camille's personal uploads (ProjectManager, same department) are **not** listed (AS5).
+3. As **System Administrator**, open **Team Documents**. **Expected**: Employee uploads from all departments are listed, and the department filter offers the distinct departments (for example, Engineering and Marketing). Choosing Marketing shows only Marketing Employees' uploads.
 
 **Negative (authorization)**:
 
@@ -247,7 +250,7 @@ As **System Administrator**, open **Document Reports** and choose today's UTC da
 | Offline | Disable networking and repeat §1 steps 1–2 | Works. CDN styling may degrade, but the feature still works (Principle I). |
 | Headers unchanged | DevTools → Network → any page and `/documents/{id}/preview` | CSP, `X-Frame-Options: DENY`, and `nosniff` are present. The preview also has `Cache-Control: no-store`. |
 | Department claim | Add a temporary debug display, or check that the cookie claims include `Department` after login | Present (Principle III) |
-| No orphans | After §1–§6, compare the `Documents` row count with the file count in `AppData\uploads` (optional, if sqlcmd is available): `sqlcmd -S "(localdb)\mssqllocaldb" -d ContosoDashboard -Q "SELECT COUNT(*) FROM Documents"` | The counts match |
+| No orphans | After §1–§6, compare the `Documents` row count with the file count in `AppData\uploads` (optional, if sqlcmd is available): `sqlcmd -S "(localdb)\mssqllocaldb" -d ContosoDashboard -Q "SELECT COUNT(*) FROM Documents"` | The counts match. The Development schema guard clears `AppData\uploads` whenever it recreates the database, so an automatic recreate doesn't break this check. After a **manual** reset, delete `AppData\uploads` yourself (§0.1). The only accepted exception is a file whose best-effort cleanup failed (spec FR-011). It's logged as a warning, is never served, and is a documented training limitation. |
 | Notification preference | As Floris, turn off in-app notifications in Profile. Have Ni Kang upload to P1. | Floris gets no new notification (FR-028) |
 
 ## 11. Automated verification (optional test project)
@@ -261,14 +264,17 @@ dotnet test .\ContosoDashboard.Tests
 
 **Expected**: All tests pass. Coverage includes:
 
-- The role × operation authorization matrix (SC-006), with at least one denial per cell of the spec's Permissions table, including role-change scope.
+- The role × operation authorization matrix (SC-006): one boundary denial test for every Permissions-table cell that limits the operation, and a positive test for every full-grant cell (marked "N/A for denial"), including role-change scope and the non-member task assignee (FR-030).
 - Write-order rules: no file when the scan is flagged or errors, no record when the storage write fails, and file cleanup when the save fails (SC-007, FR-011).
 - A fail-closed scanner fake.
 - Lists and search over 500 seeded documents, each completing under 2 s (SC-002, SC-003).
+- Timing: a 25 MB `UploadDocumentAsync` completes within 30 s (SC-001), and opening a previewable document under 10 MB for preview and reading its content completes within 3 s (SC-004), both on localhost.
+
+Each test carries a `Story` trait (`Foundation`, `US1`–`US9`, `Polish`), so you can run one story's tests with, for example, `dotnet test .\ContosoDashboard.Tests --filter "Story=US1"`.
 
 ## 12. Documentation checks
 
 - `README.md` keeps the "TRAINING PURPOSES ONLY" disclaimer.
-- README "Known Limitations" lists the **simulated EICAR-only malware scanner** (not a production control, FR-038), local filesystem storage, and the Development-only database auto-recreate.
+- README "Known Limitations" lists the **simulated EICAR-only malware scanner** (not a production control, FR-038), local filesystem storage, the Development-only database auto-recreate (which also clears `AppData\uploads`), and leftover files from a failed best-effort cleanup (logged, never served; FR-011).
 - README updates the Sample Data, Application Pages, and Database Issues sections. Database Issues also tells readers to delete `AppData\uploads` when resetting.
 - `.gitignore` excludes `ContosoDashboard/AppData/`.

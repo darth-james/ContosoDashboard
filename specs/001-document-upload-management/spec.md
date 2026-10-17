@@ -17,6 +17,7 @@
 - Q: What does "team" mean, and whose documents does a Team Lead oversee? → A: A team is the users currently in the same department (live membership). A Team Lead oversees only uploads by department members in a lower role (Employees).
 - Q: What may Team Leads and Project Managers do with others' documents they manage? → A: View, download, edit details, and delete. Only the uploader replaces the file or shares it.
 - Q: Who can remove a document from a task, and does removal change the document's project? → A: The person who attached it, or anyone allowed to edit the document's details. The document keeps its project, and the removal is recorded in the activity log.
+- Q: Can task assignees who are not project members upload or attach to a project task? → A: No; only project members, the project manager, and Administrators
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -91,8 +92,8 @@ A document's uploader keeps it accurate by editing its title, description, categ
 **Acceptance Scenarios**:
 
 1. **Given** the uploader of a document, **When** they change its title, description, category, or tags and save, **Then** the updated metadata appears in all lists and search results that include the document.
-2. **Given** the uploader of a document, **When** they replace the file with a new valid file, **Then** later downloads and previews return the new file, the file size and type are updated, and the previous file is permanently discarded (no version history is kept).
-3. **Given** the uploader of a document, **When** they choose Delete, **Then** they are asked to confirm. If they confirm, the document and its file are permanently removed. If they cancel, nothing changes.
+2. **Given** the uploader of a document, **When** they replace the file with a new valid file, **Then** later downloads and previews return the new file, the file size and type are updated, and the previous file is permanently discarded (no version history is kept). If discarding the previous file fails, the leftover file is handled as described in FR-011: it is logged and never served.
+3. **Given** the uploader of a document, **When** they choose Delete, **Then** they are asked to confirm. If they confirm, the document and its file are permanently removed (if removing the file fails, the leftover file is handled as described in FR-011). If they cancel, nothing changes.
 4. **Given** an Employee who did not upload a document, **When** they try to edit, replace, or delete it, **Then** the action is unavailable in the interface and denied if attempted by other means.
 5. **Given** a deleted document that had been shared or attached to tasks, **When** recipients or task viewers look for it, **Then** it no longer appears in Shared with Me, task attachments, project lists, search results, or the dashboard.
 6. **Given** a replacement file that fails validation (too large, unsupported type, or flagged by the malware scan), **When** the user submits it, **Then** the replacement is rejected and the existing file is kept unchanged.
@@ -121,23 +122,24 @@ A document owner shares a document with specific colleagues or with a whole team
 
 ### User Story 6 - Attach Documents to Tasks (Priority: P3)
 
-While viewing a task, a user sees the documents attached to it, attaches an existing document, uploads a new document directly from the task, or removes an attachment. Documents attached to a project task are automatically associated with that task's project. Because this exposes a document to every project member, only the document's owner, or someone allowed to edit the document's details, can attach a document that has no project to a project task. Removing a document from a task does not change the document's project.
+While viewing a task, a user sees the documents attached to it, attaches an existing document, uploads a new document directly from the task, or removes an attachment. Documents attached to a project task are automatically associated with that task's project. For a task that belongs to a project, only that project's members, its Project Manager, and Administrators can upload to or attach documents to the task. Other people who can view the task (for example, an assignee or creator who is not a project member) can see its permitted attachments but cannot add documents. Because attaching exposes a document to every project member, only the document's owner, or someone allowed to edit the document's details, can attach a document that has no project to a project task. Removing a document from a task does not change the document's project.
 
 **Why this priority**: This connects documents to day-to-day work. It is valuable but not essential for the initial document repository.
 
-**Independent Test**: Open a seeded task that belongs to a project. Upload a document from the task and confirm it is listed on the task and associated with the task's project. Attach an existing personal document you own and confirm it now appears on the task and in the project's document list. As a user who received a no-project document through a share, confirm that attaching it to the project task is refused. Remove an attachment and confirm the document is no longer on the task, is still in the project's document list, and that the attach and removal both appear in the activity records. As a user without access to the task, confirm its attachments are not visible.
+**Independent Test**: Open a seeded task that belongs to a project. Upload a document from the task and confirm it is listed on the task and associated with the task's project. Attach an existing personal document you own and confirm it now appears on the task and in the project's document list. As a user who received a no-project document through a share, confirm that attaching it to the project task is refused. Remove an attachment and confirm the document is no longer on the task, is still in the project's document list, and that the attach and removal both appear in the activity records. As a user without access to the task, confirm its attachments are not visible. As a task assignee who is not a member of the task's project, confirm that uploading to and attaching to the task are refused.
 
 **Acceptance Scenarios**:
 
 1. **Given** a user who can view a task, **When** they open it, **Then** they see the list of documents attached to the task that they are permitted to access.
-2. **Given** a user who can view a task that belongs to Project A, **When** they upload a document from the task, **Then** the document is attached to the task and automatically associated with Project A.
-3. **Given** a user who owns a document that has no project association, or who is allowed to edit that document's details, **When** they attach it to a task that belongs to Project A, **Then** the document is attached and becomes associated with Project A.
+2. **Given** a member of Project A (or its Project Manager, or an Administrator) who can view a task that belongs to Project A, **When** they upload a document from the task, **Then** the document is attached to the task and automatically associated with Project A.
+3. **Given** a member of Project A (or its Project Manager, or an Administrator) who owns a document that has no project association, or who is allowed to edit that document's details, **When** they attach it to a task that belongs to Project A, **Then** the document is attached and becomes associated with Project A.
 4. **Given** a document associated with Project B, **When** a user tries to attach it to a task in Project A, **Then** the attachment is refused with a message that the document belongs to a different project.
-5. **Given** a task that does not belong to any project, **When** a user uploads or attaches a document they can access to it, **Then** the document is attached and keeps its existing project association (or none).
-6. **Given** a user who can access a document that has no project association (for example, through a share) but neither owns it nor is allowed to edit its details, **When** they try to attach it to a task in Project A, **Then** the attachment is refused, the document stays unassociated with any project, and Project A members gain no access to it.
-7. **Given** a user who can view a task in Project A and can access a document already associated with Project A, **When** they attach it to the task, **Then** the document is attached.
+5. **Given** a task that does not belong to any project, **When** a user who can view it uploads or attaches a document they can access to it, **Then** the document is attached and keeps its existing project association (or none).
+6. **Given** a member of Project A who can access a document that has no project association (for example, through a share) but neither owns it nor is allowed to edit its details, **When** they try to attach it to a task in Project A, **Then** the attachment is refused, the document stays unassociated with any project, and Project A members gain no access to it.
+7. **Given** a member of Project A (or its Project Manager, or an Administrator) who can view a task in Project A and can access a document already associated with Project A, **When** they attach it to the task, **Then** the document is attached.
 8. **Given** a document attached to a task in Project A, **When** the person who attached it, or a user allowed to edit the document's details, removes it from the task, **Then** it no longer appears on the task, it stays associated with Project A (and in Project A's document list), and the removal is recorded in the activity records.
 9. **Given** a user who neither attached a document to a task nor is allowed to edit the document's details, **When** they try to remove it from the task, **Then** the action is unavailable in the interface and denied if attempted by other means.
+10. **Given** a user who can view a task in Project A only because they are its assignee or creator, and who is not a member of Project A, its Project Manager, or an Administrator, **When** they try to upload a document from the task or attach any document to it (including their own document that has no project), **Then** the action is unavailable in the interface and refused if attempted by other means, nothing is stored or attached, and no document's project association changes.
 
 ---
 
@@ -202,7 +204,8 @@ Document activity (uploads, downloads, previews, metadata edits, file replacemen
 - **Supported-type boundary**: File type is decided by the file extension against the allow-list, case-insensitively (for example, `.PDF` is accepted). Files with no extension or a double extension that ends in an unsupported type (for example, `report.pdf.exe`) are rejected.
 - **Unsafe or unusual file names**: File names that contain path segments, reserved characters, or very long names never affect where or how the file is stored. They are kept only as a display and download name, made safe for display.
 - **Duplicate uploads**: Uploading the same file or title twice creates two separate documents. Titles do not need to be unique.
-- **Failure during upload**: If the file cannot be fully stored (for example, an interrupted connection or a storage error), no document record is created and the user sees an error. If the record cannot be saved after the file was stored, the stored file is removed, so no orphaned files or records remain.
+- **Failure during upload**: If the file cannot be fully stored (for example, an interrupted connection or a storage error), no document record is created and the user sees an error. If the record cannot be saved after the file was stored, the stored file is removed, so no orphaned records remain. If that cleanup itself fails, the leftover file is handled as described in FR-011.
+- **Too many files at once**: Selecting more than 10 files in one upload is refused with a message that states the 10-file limit. Nothing is uploaded, and the user can select again.
 - **Malware scan step fails**: If the scan step fails or cannot complete (for example, the scanner reports an error), the upload or replacement is rejected (fail closed), no file or document record is kept (for a replacement, the existing file is kept), and the user is told to try again later.
 - **Simulated scanner coverage**: The training build's simulated scanner flags only the standard EICAR antivirus test file, including when it is saved with a supported extension such as `.txt`. Other files are treated as clean. This is a documented training limitation, not a production control.
 - **Removed project member**: A user removed from a project loses access to that project's documents, except documents they uploaded themselves (still accessible as the owner) and documents shared with them directly.
@@ -212,7 +215,7 @@ Document activity (uploads, downloads, previews, metadata edits, file replacemen
 - **Removing a task attachment**: Removing a document from a task removes only the link between them. The document keeps its project association and stays in the project's document list. Removing a document from a task is different from deleting the document.
 - **Direct links to inaccessible documents**: Requests for documents that do not exist and requests for documents the user may not access get the same "not found or not available" response, so the existence of documents is not revealed.
 - **Concurrent edits**: If two authorized users edit the same document's metadata at the same time, the last saved change wins, and both users see the saved result after refreshing.
-- **Deletion of shared or attached documents**: Deleting a document also removes its shares and task attachments. Existing notifications that refer to it lead to a "document no longer available" message.
+- **Deletion of shared or attached documents**: Deleting a document also removes its shares and task attachments. Existing notifications that refer to it keep the title they were sent with (see FR-028), and following their link shows "Document not found or not available."
 - **Tags**: Tags are trimmed and compared case-insensitively, and duplicates on the same document are ignored.
 - **Large lists**: Lists of up to 500 documents load within the performance target. Longer lists are split into pages.
 - **Unsupported preview**: Choosing Preview for a type that cannot be previewed (Office or text files) offers a download instead.
@@ -224,7 +227,7 @@ Document activity (uploads, downloads, previews, metadata edits, file replacemen
 
 #### Upload and Validation
 
-- **FR-001**: Users MUST be able to select one or more files from their computer and upload them in a single operation. Each file becomes a separate document, and each file's result (success or a specific error) is reported separately.
+- **FR-001**: Users MUST be able to select one or more files (up to 10 per batch) from their computer and upload them in a single operation. Each file becomes a separate document, and each file's result (success or a specific error) is reported separately. Selecting more than 10 files MUST be refused with a clear message that states the limit, without uploading any of them and without an unhandled error.
 - **FR-002**: The system MUST accept only these file types: PDF (`.pdf`); Microsoft Word (`.doc`, `.docx`); Microsoft Excel (`.xls`, `.xlsx`); Microsoft PowerPoint (`.ppt`, `.pptx`); plain text (`.txt`); and images (`.jpg`, `.jpeg`, `.png`). It MUST reject all other types with a message that lists the supported types.
 - **FR-003**: The system MUST reject any file larger than 25 MB, and any empty file, with a clear message that states the reason and the limit.
 - **FR-004**: Users MUST provide a title (required, up to 200 characters) and choose one category (required) from this fixed list: Project Documents, Team Resources, Personal Files, Reports, Presentations, Other. When several files are uploaded together, each file's title MUST default to its file name without the extension and MUST be editable before submission.
@@ -234,7 +237,7 @@ Document activity (uploads, downloads, previews, metadata edits, file replacemen
 - **FR-008**: The system MUST pass every uploaded or replacement file through a malware scan step before the file becomes available. The scan step MUST work without an internet connection, and MUST be replaceable with a real scanner without changing other behavior. In the training build, the scan step is a simulated scanner that flags the standard EICAR antivirus test file. Files that are flagged, or for which the scan step fails or cannot complete, MUST be rejected and not kept (fail closed).
 - **FR-009**: Stored files MUST NOT be directly reachable by a public address. Every download and preview MUST go through an access check against the requesting user's permissions.
 - **FR-010**: The system MUST store each file under a unique, system-generated name. User-supplied file names MUST NOT be used to decide where a file is stored.
-- **FR-011**: The system MUST complete file storage before creating the document record, and MUST leave no orphaned file and no orphaned record when either step fails.
+- **FR-011**: The system MUST complete file storage before creating the document record, MUST never leave a document record without its file, and MUST remove any file it already stored when a later step fails. Removing a stored file after a failure, removing the previous file after a replacement (FR-020), and removing the file of a deleted document (FR-021) are best-effort cleanups. If such a cleanup fails, the leftover file MUST be logged and MUST never be served, listed, or reachable, because no document record refers to it. This residual risk is an accepted training limitation and MUST be documented in the README.
 
 #### Browsing, Search, and Preview
 
@@ -249,8 +252,8 @@ Document activity (uploads, downloads, previews, metadata edits, file replacemen
 #### Managing Documents
 
 - **FR-019**: These users MUST be able to edit a document's title, description, category, and tags: its uploader; a Team Lead (and, by role inheritance, a Project Manager), for documents uploaded by Employees currently in their department; a Project Manager, for documents in projects they manage; and an Administrator, for all documents (see the Permissions table).
-- **FR-020**: Only a document's uploader MUST be able to replace its file with a new file. No other user, including Team Leads, Project Managers, and Administrators, may replace it. The new file goes through the same validation and scan as an upload. The previous file MUST be permanently discarded, with no version history. If the replacement fails, the existing file MUST be kept.
-- **FR-021**: The users who may edit a document's details under FR-019 MUST be able to delete it. Deletion MUST require explicit confirmation and MUST permanently remove the file, the document's metadata, its shares, and its task attachments. Activity records are kept.
+- **FR-020**: Only a document's uploader MUST be able to replace its file with a new file. No other user, including Team Leads, Project Managers, and Administrators, may replace it. The new file goes through the same validation and scan as an upload. The previous file MUST be permanently discarded, with no version history (a failed discard is handled as described in FR-011). If the replacement fails, the existing file MUST be kept.
+- **FR-021**: The users who may edit a document's details under FR-019 MUST be able to delete it. Deletion MUST require explicit confirmation and MUST permanently remove the file (a failed file removal is handled as described in FR-011), the document's metadata, its shares, and its task attachments. Activity records are kept.
 
 #### Sharing and Notifications
 
@@ -260,16 +263,20 @@ Document activity (uploads, downloads, previews, metadata edits, file replacemen
 - **FR-025**: A document's owner MUST be able to see the current shares of the document and remove any of them. Removing a share MUST revoke the access it granted immediately.
 - **FR-026**: The system MUST send an in-app notification to each recipient when a document is shared with them (directly or through their team), excluding the person who shared it.
 - **FR-027**: The system MUST send an in-app notification to every member of a project, including its Project Manager but not the uploader, when a new document is associated with that project.
-- **FR-028**: Notifications MUST follow each user's existing in-app notification preference. They MUST NOT reveal document details to users who cannot access the document.
+- **FR-028**: Notifications MUST follow each user's existing in-app notification preference. They MUST NOT reveal document details to users who cannot access the document when the notification is sent. A notification keeps the document title as it was when it was sent, as a historical record for a recipient who had access at that time; this is acceptable even if the recipient later loses access or the document is renamed or deleted. Following a notification's link MUST always re-check current access and show "Document not found or not available." when access is no longer granted.
 
 #### Task and Dashboard Integration
 
 - **FR-029**: A task's detail view MUST show the documents attached to the task that the viewing user is permitted to access.
-- **FR-030**: Users who can view a task MUST be able to upload a new document from the task and attach an existing document they can access, subject to these rules:
+- **FR-030**: Users who can view a task MUST be able to see its permitted attachments (FR-029). Uploading a new document from a task and attaching an existing document the user can access are allowed as follows:
+  - For a task that belongs to a project, only that project's members, its Project Manager, and Administrators MAY upload from the task or attach documents to it. Other users who can view the task (for example, an assignee or creator who is not a project member) MUST be refused for both uploading and attaching, and nothing is stored, attached, or re-associated.
+  - For a task that does not belong to a project, any user who can view the task MAY upload from it or attach documents to it.
+
+  Allowed uploads and attachments are subject to these rules:
   - A document attached to a task that belongs to a project MUST be associated with that project.
   - A document already associated with a different project MUST NOT be attached.
   - A document with no project association MAY be attached to a project task only by its owner or by a user allowed to edit its details (FR-019). Other users MUST be refused, and the document's project association MUST remain unchanged.
-  - Any user who can view a project task MAY attach a document they can access that is already associated with that task's project.
+  - A project member, the Project Manager, or an Administrator who can view a project task MAY attach a document they can access that is already associated with that task's project.
   - For a task that does not belong to a project, any document the user can access MAY be attached, and its project association does not change.
 - **FR-030a**: The user who attached a document to a task, or any user allowed to edit the document's details (FR-019), MUST be able to remove the document from the task. Other users MUST be refused. Removal MUST remove only the task attachment. The document's project association MUST NOT change.
 - **FR-031**: The dashboard home page MUST show a **Recent Documents** widget with the user's 5 most recently uploaded documents, newest first.
@@ -304,7 +311,7 @@ Document activity (uploads, downloads, previews, metadata edits, file replacemen
 | Replace file | Own uploads | Own uploads | Own uploads | Own uploads |
 | Delete | Own uploads | Own uploads and team members' uploads (Employees currently in their department) | Same as Team Lead, plus all documents in projects they manage | All documents |
 | Share or remove shares | Own uploads | Own uploads | Own uploads | Own uploads |
-| Attach a document to a task | Tasks they can view, using documents they can access. For a project task: documents already in that project, or their own documents with no project | Same as Employee, plus no-project documents whose metadata they can edit | Same as Team Lead | Same as Team Lead |
+| Attach a document to a task | Tasks they can view, using documents they can access. For a project task: only if they are a member of that project; then documents already in that project, or their own documents with no project. Uploading from a project task follows the same membership rule. | Same as Employee, plus no-project documents whose metadata they can edit | Same as Team Lead, and also on tasks of projects they manage | Same as Team Lead, on any task they can view, whether or not they are a project member |
 | Remove a document from a task | Attachments they made, and attachments of documents whose metadata they can edit | Same as Employee | Same as Employee | Same as Employee |
 | Team Documents view | No | Yes (uploads by Employees currently in their department) | Yes (uploads by Employees currently in their department) | Yes (all departments) |
 | Activity records and reports | No | No | No | Yes |
@@ -323,12 +330,12 @@ Document activity (uploads, downloads, previews, metadata edits, file replacemen
 
 ### Measurable Outcomes
 
-- **SC-001**: A 25 MB file finishes uploading, including validation and scanning, within 30 seconds on a typical office network or a local training workstation.
+- **SC-001**: A 25 MB file finishes uploading, including validation and scanning, within 30 seconds, measured on a local training workstation (application and browser on the same machine).
 - **SC-002**: Document lists (My Documents, Project Documents, Team Documents, Shared with Me) show their contents within 2 seconds for a user with up to 500 documents.
 - **SC-003**: Search returns results within 2 seconds when the user can access at least 500 documents.
 - **SC-004**: A PDF or image preview of a typical document (under 10 MB) appears within 3 seconds.
 - **SC-005**: From the documents area, a user can upload a single document in no more than 3 clicks, not counting typing the metadata.
-- **SC-006**: In verification testing, 100% of unauthorized access attempts are denied. This includes at least one negative case per role and per operation in the Permissions table, and covers direct links. No inaccessible document ever appears in a list, search result, dashboard widget, or notification.
+- **SC-006**: In verification testing, 100% of unauthorized access attempts are denied. Every cell of the Permissions table that limits an operation for a role has at least one boundary denial test: a request just outside what the cell allows is denied. Cells that grant the operation without limit (for example, any role uploading a personal document, or an Administrator accessing all documents) have no denial case; they are marked "not applicable for denial" and are covered by a positive test instead. Testing also covers direct links, and no inaccessible document ever appears in a list, search result, dashboard widget, or notification.
 - **SC-007**: 100% of rejected uploads (oversized, empty, unsupported type, or flagged by the malware scan) show the user a specific reason and leave no stored file and no document record.
 - **SC-008**: 100% of uploads, downloads, previews, metadata edits, replacements, deletions, share changes, and task attachments and removals performed during verification appear in the activity records with the correct user, action, document, and time.
 - **SC-009**: Within 3 months of launch, 70% of active dashboard users have uploaded at least one document.

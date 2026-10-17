@@ -143,10 +143,11 @@ Category is stored as text in `Document.Category`. Validation compares by ordina
 
 1. The requester can view the task (`ITaskService.GetTaskByIdAsync != null`) **and** can access the document (`CanAccess`). Otherwise the result is `NotFound`.
 2. Task has a project P:
+   - **Membership first**: the requester must be a member or the manager of P, or an Administrator (`CanUploadToProject(P)`). A task viewer who isn't (for example, a non-member assignee or creator) gets `Forbidden`, and nothing changes. The same rule applies to uploading from the task (`UploadDocumentAsync` with `TaskId`).
    - Document's project == P: allowed.
    - Document's project is another project: refused with `CrossProject` ("document belongs to a different project").
    - Document has no project: allowed only if the requester is the owner or `CanManage`. Otherwise `Forbidden`, and nothing changes. When allowed, `Document.ProjectId = P` and `LastModifiedDate` is updated. The new-project-document notification goes to P's members (R-12).
-3. Task has no project: allowed. The document's project is unchanged.
+3. Task has no project: allowed for any user who can view the task. The document's project is unchanged.
 
 **Detach rules** (FR-030a): the requester is the `AttachedByUserId` **or** `CanManage(document)`. Only the `TaskDocument` row is deleted, and `Document.ProjectId` is unchanged. A `TaskDetach` activity is recorded.
 
