@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using ContosoDashboard.Data;
 using ContosoDashboard.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -44,6 +45,11 @@ builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 
+// Document infrastructure (Principle II): business code depends only on the interfaces.
+builder.Services.Configure<DocumentStorageOptions>(builder.Configuration.GetSection("DocumentStorage"));
+builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+builder.Services.AddSingleton<IMalwareScanner, SimulatedEicarMalwareScanner>();
+
 // Add HttpContextAccessor for accessing user claims
 builder.Services.AddHttpContextAccessor();
 
@@ -57,6 +63,72 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
         context.Database.EnsureCreated(); // For development - use migrations in production
+
+        // Development-only schema guard (research R-03). EnsureCreated() does nothing when the database
+        // already exists, so a database created before the Documents feature has none of the new tables.
+        var schemaLogger = services.GetRequiredService<ILogger<Program>>();
+        var documentsSchemaPresent = true;
+        try
+        {
+            // Touch each new table and the new Notifications.DocumentId column.
+            _ = context.Documents.Any();
+            _ = context.DocumentTags.Any();
+            _ = context.DocumentShares.Any();
+            _ = context.TaskDocuments.Any();
+            _ = context.DocumentActivities.Any();
+            _ = context.Notifications.Select(n => n.DocumentId).Any();
+        }
+        catch (SqlException)
+        {
+            documentsSchemaPresent = false;
+        }
+
+        if (!documentsSchemaPresent)
+        {
+            if (app.Environment.IsDevelopment())
+            {
+                schemaLogger.LogWarning("Database schema predates the Documents feature; recreating training database");
+                context.Database.EnsureDeleted();
+                context.Database.EnsureCreated();
+
+                // No Documents row survives the recreate, so uploaded files would be orphaned: clear them too.
+                try
+                {
+                    var contentRoot = Path.GetFullPath(app.Environment.ContentRootPath)
+                        .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    var configuredRoot = builder.Configuration["DocumentStorage:RootPath"];
+                    if (string.IsNullOrWhiteSpace(configuredRoot))
+                    {
+                        configuredRoot = "AppData/uploads";
+                    }
+
+                    var uploadsPath = Path.GetFullPath(Path.Combine(contentRoot, configuredRoot))
+                        .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    var webRoot = Path.Combine(contentRoot, "wwwroot");
+
+                    var insideContentRoot = uploadsPath.StartsWith(contentRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+                    var underWebRoot = uploadsPath.Equals(webRoot, StringComparison.OrdinalIgnoreCase)
+                        || uploadsPath.StartsWith(webRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+
+                    if (Directory.Exists(uploadsPath) && insideContentRoot && !underWebRoot)
+                    {
+                        Directory.Delete(uploadsPath, recursive: true);
+                        schemaLogger.LogWarning("Cleared uploaded files in {Path} because the training database was recreated", uploadsPath);
+                    }
+                }
+                catch (Exception clearEx)
+                {
+                    schemaLogger.LogWarning(clearEx, "Could not clear the uploads folder after recreating the training database");
+                }
+            }
+            else
+            {
+                schemaLogger.LogError(
+                    "Database schema predates the Documents feature. Nothing was deleted. " +
+                    "Follow the database reset instructions in the README (stop and delete the LocalDB instance or drop the database, " +
+                    "and delete the files under AppData/uploads), then restart the application.");
+            }
+        }
     }
     catch (Exception ex)
     {
@@ -105,6 +177,9 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Razor Pages endpoints (login, logout, and the document download/preview endpoints). Harmless alongside the
+// fallback below; it makes the routing of parameterized pages such as /documents/{id:int}/download explicit (R-06).
+app.MapRazorPages();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 

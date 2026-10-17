@@ -53,15 +53,15 @@ description: "Task list for Document Upload and Management"
 
 **Purpose**: Repository configuration and the empty test project
 
-- [ ] T001 Add the line `ContosoDashboard/AppData/` to `.gitignore` (repository root), under a `# Document uploads (runtime only)` comment, so uploaded files are never committed (R-05)
-- [ ] T002 [P] Add `"DocumentStorage": { "RootPath": "AppData/uploads" }` as a top-level section in `ContosoDashboard\appsettings.json` (contracts\infrastructure-interfaces.md, "Configuration contract")
-- [ ] T003 [P] Create the xUnit test project `ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`:
+- [x] T001 Add the line `ContosoDashboard/AppData/` to `.gitignore` (repository root), under a `# Document uploads (runtime only)` comment, so uploaded files are never committed (R-05)
+- [x] T002 [P] Add `"DocumentStorage": { "RootPath": "AppData/uploads" }` as a top-level section in `ContosoDashboard\appsettings.json` (contracts\infrastructure-interfaces.md, "Configuration contract")
+- [x] T003 [P] Create the xUnit test project `ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`:
   - `net8.0`, `<Nullable>enable</Nullable>`, `<ImplicitUsings>enable</ImplicitUsings>`, `<IsPackable>false</IsPackable>`
   - Test-time-only `PackageReference`s: `Microsoft.NET.Test.Sdk`, `xunit`, `xunit.runner.visualstudio`
   - `<ProjectReference Include="..\ContosoDashboard\ContosoDashboard.csproj" />`
   - Don't change `ContosoDashboard\ContosoDashboard.csproj`. No new runtime packages.
-- [ ] T004 Add `ContosoDashboard.Tests\xunit.runner.json` with `{ "parallelizeTestCollections": false }` so timing tests don't compete with other tests. Include it in `ContosoDashboard.Tests\ContosoDashboard.Tests.csproj` as `<None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />`. (Depends on T003.)
-- [ ] T005 Run `dotnet build ContosoDashboard\ContosoDashboard.csproj` and `dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`. Both must succeed. Note the current warning count for `ContosoDashboard` as the "no new warnings" baseline that the constitution build gate checks in T129.
+- [x] T004 Add `ContosoDashboard.Tests\xunit.runner.json` with `{ "parallelizeTestCollections": false }` so timing tests don't compete with other tests. Include it in `ContosoDashboard.Tests\ContosoDashboard.Tests.csproj` as `<None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />`. (Depends on T003.)
+- [x] T005 Run `dotnet build ContosoDashboard\ContosoDashboard.csproj` and `dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`. Both must succeed. Note the current warning count for `ContosoDashboard` as the "no new warnings" baseline that the constitution build gate checks in T129.
 
 ---
 
@@ -86,7 +86,7 @@ description: "Task list for Document Upload and Management"
 
 ### 2a. Data model and schema
 
-- [ ] T006 [P] Create entity `ContosoDashboard\Models\Document.cs` (data-model.md "Document"), using `[Key]`, `[Required]`, and `[MaxLength]` annotations like the existing models:
+- [x] T006 [P] Create entity `ContosoDashboard\Models\Document.cs` (data-model.md "Document"), using `[Key]`, `[Required]`, and `[MaxLength]` annotations like the existing models:
   - **Fields** (constraints quoted from data-model.md):
     - `DocumentId` (`int` PK, identity)
     - `Title` (`nvarchar(200)` required, "Trimmed, 1–200 characters")
@@ -101,16 +101,16 @@ description: "Task list for Document Upload and Management"
     - `FileType` (`nvarchar(255)` required, "Canonical MIME derived from the allow-listed extension")
     - `FilePath` (`nvarchar(500)` required, **unique**, "Relative, portable storage key `{uploaderId}/{projectId|personal}/{guid:N}{ext}`")
   - **Virtual navigations**: `UploadedByUser`, `Project?`, `Tags`, `Shares`, `TaskAttachments`
-- [ ] T007 [P] Create entity `ContosoDashboard\Models\DocumentTag.cs`:
+- [x] T007 [P] Create entity `ContosoDashboard\Models\DocumentTag.cs`:
   - Fields: `DocumentTagId` (`int` PK), `DocumentId` (`int` FK), `Tag` (`[Required][MaxLength(50)]`, "Trimmed and non-empty. Duplicates on the same document are ignored, compared case-insensitively")
   - Virtual navigation: `Document`
-- [ ] T008 [P] Create entity `ContosoDashboard\Models\DocumentShare.cs`:
+- [x] T008 [P] Create entity `ContosoDashboard\Models\DocumentShare.cs`:
   - Fields: `DocumentShareId` (`int` PK), `DocumentId` (`int` FK), `SharedByUserId` (`int` FK, "Always the document owner"), `SharedWithUserId` (`int?`, "Set for a user share"), `SharedWithDepartment` (`[MaxLength(100)]` nullable, "Set for a team share. Matches `User.Department`, which is also 100"), `SharedDate` (`DateTime`, UTC)
   - Virtual navigations: `Document`, `SharedByUser`, `SharedWithUser?`
-- [ ] T009 [P] Create entity `ContosoDashboard\Models\TaskDocument.cs`:
+- [x] T009 [P] Create entity `ContosoDashboard\Models\TaskDocument.cs`:
   - Fields: `TaskDocumentId` (`int` PK), `TaskId` (`int` FK → `Tasks`), `DocumentId` (`int` FK → `Documents`), `AttachedByUserId` (`int` FK → `Users`, "Used by the detach rule (FR-030a)"), `AttachedDate` (`DateTime`, UTC)
   - Virtual navigations: `Task` (`TaskItem`), `Document`, `AttachedByUser`
-- [ ] T010 [P] Create `ContosoDashboard\Models\DocumentActivity.cs`:
+- [x] T010 [P] Create `ContosoDashboard\Models\DocumentActivity.cs`:
   - Entity `DocumentActivity` fields:
     - `DocumentActivityId` (`int` PK)
     - `DocumentId` (`int` required, **no FK**, "Survives document deletion (FR-036)")
@@ -123,12 +123,12 @@ description: "Task list for Document Upload and Management"
     - `OccurredAt` (`DateTime`, UTC)
     - Virtual navigation `User`
   - Enum `DocumentActivityAction { Upload = 0, Download = 1, Preview = 2, MetadataEdit = 3, Replace = 4, Delete = 5, Share = 6, ShareRemoved = 7, TaskAttach = 8, TaskDetach = 9 }`
-- [ ] T011 [P] Create static class `ContosoDashboard\Models\DocumentCategories.cs` with `public static readonly IReadOnlyList<string> All = ["Project Documents", "Team Resources", "Personal Files", "Reports", "Presentations", "Other"];` and `public static bool IsValid(string? value)`, which compares by ordinal (data-model.md "DocumentCategories")
-- [ ] T012 [P] Modify `ContosoDashboard\Models\Notification.cs`:
+- [x] T011 [P] Create static class `ContosoDashboard\Models\DocumentCategories.cs` with `public static readonly IReadOnlyList<string> All = ["Project Documents", "Team Resources", "Personal Files", "Reports", "Presentations", "Other"];` and `public static bool IsValid(string? value)`, which compares by ordinal (data-model.md "DocumentCategories")
+- [x] T012 [P] Modify `ContosoDashboard\Models\Notification.cs`:
   - Add `public int? DocumentId { get; set; }` (no FK, no navigation).
   - **Append** `DocumentShared` and `DocumentAdded` to the end of `NotificationType`. Existing integer values must not change (R-12).
-- [ ] T013 [P] Add optional inverse navigations `public virtual ICollection<Document> Documents { get; set; } = new List<Document>();` to `ContosoDashboard\Models\Project.cs`, and `public virtual ICollection<TaskDocument> DocumentAttachments { get; set; } = new List<TaskDocument>();` to `ContosoDashboard\Models\TaskItem.cs`. Make no column changes.
-- [ ] T014 Configure the new entities in `ContosoDashboard\Data\ApplicationDbContext.cs` (data-model.md). Depends on T006–T013.
+- [x] T013 [P] Add optional inverse navigations `public virtual ICollection<Document> Documents { get; set; } = new List<Document>();` to `ContosoDashboard\Models\Project.cs`, and `public virtual ICollection<TaskDocument> DocumentAttachments { get; set; } = new List<TaskDocument>();` to `ContosoDashboard\Models\TaskItem.cs`. Make no column changes.
+- [x] T014 Configure the new entities in `ContosoDashboard\Data\ApplicationDbContext.cs` (data-model.md). Depends on T006–T013.
   - **DbSets**: `Documents`, `DocumentTags`, `DocumentShares`, `TaskDocuments`, `DocumentActivities`
   - **Relationships and delete behavior**:
     - `Restrict`: `User→Document` (UploadedByUserId), `Project→Document` (ProjectId), `User→DocumentShare` (SharedByUserId and SharedWithUserId), `User→TaskDocument` (AttachedByUserId), `User→DocumentActivity` (UserId)
@@ -150,7 +150,7 @@ description: "Task list for Document Upload and Management"
     - `TaskDocuments`: unique (`TaskId`, `DocumentId`) and `DocumentId`
     - `DocumentActivities`: `OccurredAt`, (`Action`, `OccurredAt`), `DocumentId`, `UserId`
   - **Check constraint** `CK_DocumentShares_SingleTarget`, verbatim: `([SharedWithUserId] IS NOT NULL AND [SharedWithDepartment] IS NULL) OR ([SharedWithUserId] IS NULL AND [SharedWithDepartment] IS NOT NULL)`
-- [ ] T015 Extend `SeedData` in `ContosoDashboard\Data\ApplicationDbContext.cs` (R-14; keep IDs 1–4 unchanged). Depends on T014 (same file).
+- [x] T015 Extend `SeedData` in `ContosoDashboard\Data\ApplicationDbContext.cs` (R-14; keep IDs 1–4 unchanged). Depends on T014 (same file).
   - **Users** (all with `InAppNotificationsEnabled = true`):
     - 5 Dana Whitfield (`dana.whitfield@contoso.com`, Employee, Engineering)
     - 6 Mateo Alvarez (`mateo.alvarez@contoso.com`, Employee, Marketing)
@@ -161,16 +161,16 @@ description: "Task list for Document Upload and Management"
   - **TaskItem** 4: "Prepare onboarding checklist" (no project, assignee 4, creator 3)
   - **TaskItem** 5: "Draft launch copy" (Project 2, assignee 6, creator 8)
   - Don't seed any documents.
-- [ ] T016 Add the **Development-only schema guard** in `ContosoDashboard\Program.cs`, inside the existing database-initialization `try` block, right after `context.Database.EnsureCreated()` (R-03):
+- [x] T016 Add the **Development-only schema guard** in `ContosoDashboard\Program.cs`, inside the existing database-initialization `try` block, right after `context.Database.EnsureCreated()` (R-03):
   1. Probe the new schema with a query that touches each new table and the new `Notifications.DocumentId` column (for example, `context.Documents.Any()`, `context.DocumentTags.Any()`, `context.DocumentShares.Any()`, `context.TaskDocuments.Any()`, `context.DocumentActivities.Any()`, `context.Notifications.Select(n => n.DocumentId).Any()`), wrapped in `catch (SqlException)`.
   2. On failure **in Development**, log the warning "Database schema predates the Documents feature; recreating training database", then call `EnsureDeleted()` followed by `EnsureCreated()`. Then **clear the uploads folder**, because no `Documents` row survives the recreate: resolve `builder.Configuration["DocumentStorage:RootPath"]` (default `AppData/uploads`) against `app.Environment.ContentRootPath`, and only if the folder exists, is inside the content root, and isn't under `wwwroot`, delete it recursively and log the warning "Cleared uploaded files in {path} because the training database was recreated". A failure to clear is logged as a warning and doesn't stop startup.
   3. **Outside Development**, log an error that points to the README reset instructions, and don't delete anything (neither the database nor any files).
 
 ### 2b. Infrastructure and service contracts
 
-- [ ] T017 [P] Create `ContosoDashboard\Services\IFileStorageService.cs` exactly as in contracts\infrastructure-interfaces.md: `UploadAsync(Stream fileStream, string storageKey, string contentType)` returns `Task<string>`, `DeleteAsync(string storageKey)`, `DownloadAsync(string storageKey)` returns `Task<Stream>`, and `GetUrlAsync(string storageKey, TimeSpan expiration)` returns `Task<string>`. Include XML docs stating that keys are caller-generated, forward-slash, relative, and never derived from user file names.
-- [ ] T018 [P] Create `ContosoDashboard\Services\IMalwareScanner.cs` with `enum MalwareScanStatus { Clean, Infected, Error }`, `sealed record MalwareScanResult(MalwareScanStatus Status, string? Detail = null)`, and `IMalwareScanner.ScanAsync(Stream content, string fileName, CancellationToken cancellationToken = default)`. XML docs must say that the scanner reads from the current position, MUST restore `Position`, and MUST NOT throw for infected content.
-- [ ] T019 [P] Create `ContosoDashboard\Services\DocumentModels.cs` with the shared types from contracts\service-interfaces.md, "Shared types":
+- [x] T017 [P] Create `ContosoDashboard\Services\IFileStorageService.cs` exactly as in contracts\infrastructure-interfaces.md: `UploadAsync(Stream fileStream, string storageKey, string contentType)` returns `Task<string>`, `DeleteAsync(string storageKey)`, `DownloadAsync(string storageKey)` returns `Task<Stream>`, and `GetUrlAsync(string storageKey, TimeSpan expiration)` returns `Task<string>`. Include XML docs stating that keys are caller-generated, forward-slash, relative, and never derived from user file names.
+- [x] T018 [P] Create `ContosoDashboard\Services\IMalwareScanner.cs` with `enum MalwareScanStatus { Clean, Infected, Error }`, `sealed record MalwareScanResult(MalwareScanStatus Status, string? Detail = null)`, and `IMalwareScanner.ScanAsync(Stream content, string fileName, CancellationToken cancellationToken = default)`. XML docs must say that the scanner reads from the current position, MUST restore `Position`, and MUST NOT throw for infected content.
+- [x] T019 [P] Create `ContosoDashboard\Services\DocumentModels.cs` with the shared types from contracts\service-interfaces.md, "Shared types":
   - `DocumentErrorCode`
   - `DocumentOperationResult` with the `Ok` and `Fail` factories
   - `DocumentSortField`
@@ -195,7 +195,7 @@ description: "Task list for Document Upload and Management"
 
 ### 2c. Test harness and foundational tests (write first; stub-dependent tests fail at runtime before 2d)
 
-- [ ] T132 Add compile-only stubs under `ContosoDashboard\Services\` for every 2d member that the 2c tests call, so the solution builds before any test is written (stub-first rule). Every method body is `throw new NotImplementedException()`; constants and records are real.
+- [x] T132 Add compile-only stubs under `ContosoDashboard\Services\` for every 2d member that the 2c tests call, so the solution builds before any test is written (stub-first rule). Every method body is `throw new NotImplementedException()`; constants and records are real.
   - `ContosoDashboard\Services\LocalFileStorageService.cs`: `DocumentStorageOptions` (real) and `LocalFileStorageService : IFileStorageService` with its constructors and stubbed members
   - `ContosoDashboard\Services\SimulatedEicarMalwareScanner.cs`: `SimulatedEicarMalwareScanner : IMalwareScanner` with a stubbed `ScanAsync`
   - `ContosoDashboard\Services\DocumentFileRules.cs`: the static class with `MaxFileSizeBytes` (real) and stubbed `IsPreviewable`, `TryGetFileType`, `ValidateFile`, `SanitizeFileName`, `ValidateMetadata`, `NormalizeTags`, `GetDisplayName`, and `SupportedTypesDescription`
@@ -203,16 +203,16 @@ description: "Task list for Document Upload and Management"
   - `ContosoDashboard\Services\NotificationService.cs`: `CreateNotificationsAsync` added to `INotificationService` and stubbed in `NotificationService`
 
   **Done when** `dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj` succeeds with no new errors or warnings. Depends on T006–T019. T031–T035 replace these bodies.
-- [ ] T020 Create `ContosoDashboard.Tests\LocalDbFixture.cs` and an xUnit `[CollectionDefinition("LocalDb")]` in the same file.
+- [x] T020 Create `ContosoDashboard.Tests\LocalDbFixture.cs` and an xUnit `[CollectionDefinition("LocalDb")]` in the same file.
   - The fixture creates a uniquely named database `ContosoDashboard_Tests_{Guid:N}` on `(localdb)\mssqllocaldb` with `EnsureCreated()`, so the seed users 1–8, projects 1–2, and tasks 1–5 exist.
   - It exposes `ApplicationDbContext CreateContext(params IInterceptor[] interceptors)` and a per-fixture temp storage root `Path.Combine(Path.GetTempPath(), "ContosoDashboardTests", Guid)`.
   - On dispose, it calls `EnsureDeleted()` and deletes the temp root.
   - Tests MUST NOT assume an empty `Documents` table. They assert on IDs or unique titles they created themselves.
   - Depends on T014 and T015.
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings.
-- [ ] T021 [P] Create `ContosoDashboard.Tests\EicarTestBytes.cs`. It builds the 68-byte EICAR test string **at runtime** by joining `"X5O!P%@AP[4\\PZX54(P^)7CC)7}"` and `"$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"`, and never stores them as one literal. Expose `byte[] Canonical()` and `byte[] WithLeadingLine()`, which prefixes "Training malware test\r\n". The bytes exist only in memory and are never written to disk.
+- [x] T021 [P] Create `ContosoDashboard.Tests\EicarTestBytes.cs`. It builds the 68-byte EICAR test string **at runtime** by joining `"X5O!P%@AP[4\\PZX54(P^)7CC)7}"` and `"$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"`, and never stores them as one literal. Expose `byte[] Canonical()` and `byte[] WithLeadingLine()`, which prefixes "Training malware test\r\n". The bytes exist only in memory and are never written to disk.
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings.
-- [ ] T022 [P] Create `ContosoDashboard.Tests\DocumentTestData.cs` with arrange helpers that insert rows **directly** through `ApplicationDbContext`, so a story's tests don't depend on another story's service:
+- [x] T022 [P] Create `ContosoDashboard.Tests\DocumentTestData.cs` with arrange helpers that insert rows **directly** through `ApplicationDbContext`, so a story's tests don't depend on another story's service:
   - `AddDocumentAsync(uploaderId, projectId?, title, category, tags, fileType, bytes?)` writes the bytes through `LocalFileStorageService` under a generated key when `bytes` is provided.
   - `AddUserShareAsync`
   - `AddDepartmentShareAsync`
@@ -221,7 +221,7 @@ description: "Task list for Document Upload and Management"
   - `AddTaskAsync(projectId?, assignedUserId, createdByUserId, title)`, so tests can create throwaway tasks (for example, a P1 task assigned to a non-member) without changing the seed tasks
   - `SeedBulkDocumentsAsync(ownerId, count: 500)` with mixed categories, projects, dates, and tags
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings.
-- [ ] T023 [P] Create `ContosoDashboard.Tests\TestServiceFactory.cs` with factory methods that build real infrastructure against a `LocalDbFixture`:
+- [x] T023 [P] Create `ContosoDashboard.Tests\TestServiceFactory.cs` with factory methods that build real infrastructure against a `LocalDbFixture`:
   - `CreateFileStorage()`: `LocalFileStorageService` with `RootPath` = fixture temp root
   - `CreateScanner()`: `SimulatedEicarMalwareScanner`
   - `CreateNotificationService(ctx)`
@@ -229,9 +229,9 @@ description: "Task list for Document Upload and Management"
 
   Use `NullLogger<T>`. Later stories add document-service factory methods to this file.
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings.
-- [ ] T024 [P] Create the base partial class `ContosoDashboard.Tests\DocumentAuthorizationMatrixTests.cs` (`[Collection("LocalDb")]`, constructor takes `LocalDbFixture`). Include the seeded-user constants `Admin = 1, Camille = 2, Floris = 3, NiKang = 4, Dana = 5, Mateo = 6, Hana = 7, Rafael = 8` and `Project1 = 1, Project2 = 2`. Add a header comment table that maps each of the 44 cells of the spec's Permissions table (11 operations × 4 roles) either to the boundary denial test method(s) that cover it, or, for a full-grant cell, to "N/A for denial" plus the positive test method that covers the grant (SC-006). Fill it in story by story, and complete it in T126.
+- [x] T024 [P] Create the base partial class `ContosoDashboard.Tests\DocumentAuthorizationMatrixTests.cs` (`[Collection("LocalDb")]`, constructor takes `LocalDbFixture`). Include the seeded-user constants `Admin = 1, Camille = 2, Floris = 3, NiKang = 4, Dana = 5, Mateo = 6, Hana = 7, Rafael = 8` and `Project1 = 1, Project2 = 2`. Add a header comment table that maps each of the 44 cells of the spec's Permissions table (11 operations × 4 roles) either to the boundary denial test method(s) that cover it, or, for a full-grant cell, to "N/A for denial" plus the positive test method that covers the grant (SC-006). Fill it in story by story, and complete it in T126.
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings.
-- [ ] T025 [P] Write `ContosoDashboard.Tests\SchemaTests.cs` (LocalDb collection). Assert:
+- [x] T025 [P] Write `ContosoDashboard.Tests\SchemaTests.cs` (LocalDb collection). Assert:
   - All five tables exist, along with `Notifications.DocumentId`.
   - Seed users 5–8, project 2, project member 3, and tasks 4–5 have the R-14 values.
   - Inserting a share with both targets null, or both set, throws `DbUpdateException` (`CK_DocumentShares_SingleTarget`).
@@ -239,7 +239,7 @@ description: "Task list for Document Upload and Management"
   - Deleting a `Document` cascades to its tags, shares, and task attachments, but leaves `DocumentActivities` rows in place.
   - A duplicate `FilePath` throws.
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings. These schema tests exercise real code from T014–T015, so they may already pass. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
-- [ ] T026 [P] Write `ContosoDashboard.Tests\LocalFileStorageServiceTests.cs`:
+- [x] T026 [P] Write `ContosoDashboard.Tests\LocalFileStorageServiceTests.cs`:
   - `UploadAsync` rejects (`ArgumentException`) keys that are null or empty, rooted (`C:\x`, `/x`), contain `..`, or contain `\`.
   - A key that resolves outside the root is rejected.
   - A round trip of upload and then download returns identical bytes.
@@ -249,13 +249,13 @@ description: "Task list for Document Upload and Management"
   - `GetUrlAsync` throws `NotSupportedException`.
   - The resolved root is never under `wwwroot`.
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
-- [ ] T027 [P] Write `ContosoDashboard.Tests\SimulatedEicarMalwareScannerTests.cs`, using `EicarTestBytes` in a `MemoryStream`:
+- [x] T027 [P] Write `ContosoDashboard.Tests\SimulatedEicarMalwareScannerTests.cs`, using `EicarTestBytes` in a `MemoryStream`:
   - Canonical bytes and bytes with a leading line both return `Infected`.
   - Ordinary text and PNG-like bytes return `Clean`.
   - `Position` is restored to its pre-scan value after every scan.
   - A signature split across the scanner's internal read-buffer boundary is still detected.
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
-- [ ] T028 [P] Write `ContosoDashboard.Tests\DocumentFileRulesTests.cs`:
+- [x] T028 [P] Write `ContosoDashboard.Tests\DocumentFileRulesTests.cs`:
   - **Size**: 26,214,400 bytes is accepted, 26,214,401 is rejected, and 0 is rejected.
   - **Extensions**: `.PDF` is accepted (case-insensitive). `report.pdf.exe`, `bundle.zip`, `tool.exe`, and a name with no extension are rejected.
   - **MIME**: every R-11 extension maps to its canonical MIME. Only `application/pdf`, `image/jpeg`, and `image/png` are previewable.
@@ -271,7 +271,7 @@ description: "Task list for Document Upload and Management"
     - Tags are trimmed, empty tags are dropped, duplicates are removed (`OrdinalIgnoreCase`), there are at most 10, and each is ≤ 50 characters.
   - **Display names**: `GetDisplayName(mime)` returns "PDF", "Word", "Excel", "PowerPoint", "Text", "JPEG", or "PNG".
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
-- [ ] T029 [P] Write `ContosoDashboard.Tests\DocumentAccessPolicyTests.cs` (LocalDb collection). Use `DocumentTestData` and run each predicate **as an EF query** against LocalDB, so a client-evaluation exception fails the test. Assert the R-02 truths for `CanAccess`, `CanManage`, `IsOwner`, and `CanUploadToProject`:
+- [x] T029 [P] Write `ContosoDashboard.Tests\DocumentAccessPolicyTests.cs` (LocalDb collection). Use `DocumentTestData` and run each predicate **as an EF query** against LocalDB, so a client-evaluation exception fails the test. Assert the R-02 truths for `CanAccess`, `CanManage`, `IsOwner`, and `CanUploadToProject`:
   - **Owner**: the uploader can access and manage their own document.
   - **Project**: a member of the document's project and that project's manager can access it.
   - **Shares**: a user share grants access, and a department share grants access to whoever is in that department **now**.
@@ -281,12 +281,12 @@ description: "Task list for Document Upload and Management"
   - **Upload to a project**: allowed for a project member or the project manager, or for any project if the requester is an Administrator.
   - **Unknown user**: `LoadUserContextAsync` for a nonexistent user returns null.
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
-- [ ] T030 [P] Write `ContosoDashboard.Tests\NotificationServiceTests.cs`. `CreateNotificationsAsync` inserts all notifications in one save, returns the inserted count, and **skips** recipients whose `InAppNotificationsEnabled == false` (FR-028). It persists `DocumentId` and the new `NotificationType` values. The existing `CreateNotificationAsync` behavior is unchanged.
+- [x] T030 [P] Write `ContosoDashboard.Tests\NotificationServiceTests.cs`. `CreateNotificationsAsync` inserts all notifications in one save, returns the inserted count, and **skips** recipients whose `InAppNotificationsEnabled == false` (FR-028). It persists `DocumentId` and the new `NotificationType` values. The existing `CreateNotificationAsync` behavior is unchanged.
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "Foundation")]` on the class or each method.
 
 ### 2d. Foundational implementation
 
-- [ ] T031 [P] Implement `ContosoDashboard\Services\LocalFileStorageService.cs` (R-05) with `public sealed class DocumentStorageOptions { public string RootPath { get; set; } = "AppData/uploads"; }` in the same file. The constructor takes `IOptions<DocumentStorageOptions>` and `IWebHostEnvironment` (or an explicit root for tests) and resolves the root against `ContentRootPath`.
+- [x] T031 [P] Implement `ContosoDashboard\Services\LocalFileStorageService.cs` (R-05) with `public sealed class DocumentStorageOptions { public string RootPath { get; set; } = "AppData/uploads"; }` in the same file. The constructor takes `IOptions<DocumentStorageOptions>` and `IWebHostEnvironment` (or an explicit root for tests) and resolves the root against `ContentRootPath`.
   - **Key validation**: reject keys that are null or empty, rooted, contain `..`, contain `\`, or contain invalid path characters.
   - **Containment**: `Path.GetFullPath(Path.Combine(root, key))` must start with the full root, or the call throws.
   - **Writing**: create directories on demand. Write with `FileMode.CreateNew`. If a write fails partway, delete the partial file and rethrow.
@@ -294,8 +294,8 @@ description: "Task list for Document Upload and Management"
   - **`DownloadAsync`**: returns a read-only `FileStream` (`FileShare.Read`, `useAsync: true`).
   - **`GetUrlAsync`**: throws `NotSupportedException`.
   - Makes T026 pass.
-- [ ] T032 [P] Implement `ContosoDashboard\Services\SimulatedEicarMalwareScanner.cs` (R-08). Build the signature at runtime from two halves (or decode it from Base64) so it never appears as one literal. Search the stream for the signature anywhere, using a buffer that overlaps by 67 bytes. Restore `Position` afterward. Return `Infected` with the detail "EICAR test signature", otherwise `Clean`. Add an XML doc comment that marks it as a training-only limitation. Makes T027 pass.
-- [ ] T033 [P] Implement the static class `ContosoDashboard\Services\DocumentFileRules.cs` (R-11):
+- [x] T032 [P] Implement `ContosoDashboard\Services\SimulatedEicarMalwareScanner.cs` (R-08). Build the signature at runtime from two halves (or decode it from Base64) so it never appears as one literal. Search the stream for the signature anywhere, using a buffer that overlaps by 67 bytes. Restore `Position` afterward. Return `Infected` with the detail "EICAR test signature", otherwise `Clean`. Add an XML doc comment that marks it as a training-only limitation. Makes T027 pass.
+- [x] T033 [P] Implement the static class `ContosoDashboard\Services\DocumentFileRules.cs` (R-11):
   - `MaxFileSizeBytes = 26_214_400`
   - The extension → MIME allow-list from the R-11 table, case-insensitive
   - `IsPreviewable(mime)`
@@ -308,23 +308,23 @@ description: "Task list for Document Upload and Management"
   - `SupportedTypesDescription`
 
   Makes T028 pass.
-- [ ] T034 [P] Implement the static class `ContosoDashboard\Services\DocumentAccessPolicy.cs` (R-02):
+- [x] T034 [P] Implement the static class `ContosoDashboard\Services\DocumentAccessPolicy.cs` (R-02):
   - `sealed record DocumentUserContext(int UserId, UserRole Role, string? Department)`
   - `static Task<DocumentUserContext?> LoadUserContextAsync(ApplicationDbContext, int userId)`, which reads `Users` live
   - EF-translatable `Expression<Func<Document,bool>>` builders: `CanAccess(ctx)`, `CanManage(ctx)`, `IsOwner(ctx)`, `IsTeamOversight(ctx)` (role ≥ TeamLead ∧ non-empty department ∧ `d.UploadedByUser.Department == dept` ∧ `d.UploadedByUser.Role == UserRole.Employee`)
   - `Expression<Func<Project,bool>> CanUploadToProject(ctx)`
 
   Treat an empty or whitespace department as "no department". Makes T029 pass.
-- [ ] T035 [P] Add `Task<int> CreateNotificationsAsync(IEnumerable<Notification> notifications)` to `INotificationService` and `NotificationService` in `ContosoDashboard\Services\NotificationService.cs`. It loads recipients' `InAppNotificationsEnabled` in one query, skips disabled recipients, sets `CreatedDate` to UTC, and does one `SaveChangesAsync()`. Leave existing members unchanged. Makes T030 pass.
-- [ ] T036 [P] Add `new Claim("Department", user.Department)` to the claims list in `ContosoDashboard\Pages\Login.cshtml.cs` when `!string.IsNullOrEmpty(user.Department)` (R-09). Claims are for display and UI hints only.
-- [ ] T083 [P] Create `ContosoDashboard\Shared\ConfirmDialog.razor`, a Blazor-rendered modal (Bootstrap classes, no Bootstrap JS, no JS interop) with the parameters `Visible`, `Title`, `Message`, `ConfirmText` (default "Delete"), `OnConfirm`, and `OnCancel` (R-17, contracts\ui-routes.md "ConfirmDialog"). It's shared by US4 (delete, T084) and US6 (remove from task, T102), so it's built here once. Moved from US4; the ID is unchanged.
-- [ ] T037 Register infrastructure in `ContosoDashboard\Program.cs` after the existing service registrations: `builder.Services.Configure<DocumentStorageOptions>(builder.Configuration.GetSection("DocumentStorage"));`, `builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();`, and `builder.Services.AddSingleton<IMalwareScanner, SimulatedEicarMalwareScanner>();`. Depends on T031, T032, and T016 (same file).
-- [ ] T038 Verify Razor Pages endpoint routing in `ContosoDashboard\Program.cs` (R-06, http-endpoints.md "Routing notes"):
+- [x] T035 [P] Add `Task<int> CreateNotificationsAsync(IEnumerable<Notification> notifications)` to `INotificationService` and `NotificationService` in `ContosoDashboard\Services\NotificationService.cs`. It loads recipients' `InAppNotificationsEnabled` in one query, skips disabled recipients, sets `CreatedDate` to UTC, and does one `SaveChangesAsync()`. Leave existing members unchanged. Makes T030 pass.
+- [x] T036 [P] Add `new Claim("Department", user.Department)` to the claims list in `ContosoDashboard\Pages\Login.cshtml.cs` when `!string.IsNullOrEmpty(user.Department)` (R-09). Claims are for display and UI hints only.
+- [x] T083 [P] Create `ContosoDashboard\Shared\ConfirmDialog.razor`, a Blazor-rendered modal (Bootstrap classes, no Bootstrap JS, no JS interop) with the parameters `Visible`, `Title`, `Message`, `ConfirmText` (default "Delete"), `OnConfirm`, and `OnCancel` (R-17, contracts\ui-routes.md "ConfirmDialog"). It's shared by US4 (delete, T084) and US6 (remove from task, T102), so it's built here once. Moved from US4; the ID is unchanged.
+- [x] T037 Register infrastructure in `ContosoDashboard\Program.cs` after the existing service registrations: `builder.Services.Configure<DocumentStorageOptions>(builder.Configuration.GetSection("DocumentStorage"));`, `builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();`, and `builder.Services.AddSingleton<IMalwareScanner, SimulatedEicarMalwareScanner>();`. Depends on T031, T032, and T016 (same file).
+- [x] T038 Verify Razor Pages endpoint routing in `ContosoDashboard\Program.cs` (R-06, http-endpoints.md "Routing notes"):
   1. Run the app. Confirm `/login` and `/logout` are served by their Razor Pages, which shows that `MapFallbackToPage("/_Host")` registered the Razor Pages data source.
   2. Add `app.MapRazorPages();` right before `app.MapBlazorHub();`. It's harmless with the fallback, and it makes the routing of parameterized pages such as `/documents/{id:int}/download` explicit.
   3. Leave the security-header middleware and the CSP string untouched.
   4. T056 re-verifies routing once a real document endpoint exists.
-- [ ] T039 Foundation checkpoint for `ContosoDashboard\ContosoDashboard.csproj` and `ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`:
+- [x] T039 Foundation checkpoint for `ContosoDashboard\ContosoDashboard.csproj` and `ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`:
   - `dotnet build` both projects with no new warnings.
   - `dotnet test ContosoDashboard.Tests --filter "Story=Foundation"` passes T025–T030.
   - Run `dotnet run --launch-profile https` against (a) no database and (b) a pre-feature `ContosoDashboard` database with a dummy file placed in `ContosoDashboard\AppData\uploads` first. In both cases the app starts and has the new tables. In case (b), both guard warnings are logged and the dummy file is gone.

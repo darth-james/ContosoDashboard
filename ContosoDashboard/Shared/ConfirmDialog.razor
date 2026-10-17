@@ -1,0 +1,45 @@
+@* Shared confirmation modal (research R-17). Rendered by Blazor with Bootstrap classes only:
+   no Bootstrap JavaScript and no JS interop. Used for deleting a document (US4) and removing a task attachment (US6).
+   Cancel (or the close button) never changes anything; the parent owns the Visible flag. *@
+
+@if (Visible)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirm-dialog-title">@Title</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CancelAsync"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">@Message</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelAsync">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmAsync">@ConfirmText</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Whether the dialog is shown.</summary>
+    [Parameter] public bool Visible { get; set; }
+
+    [Parameter] public string Title { get; set; } = string.Empty;
+
+    [Parameter] public string Message { get; set; } = string.Empty;
+
+    /// <summary>Text of the confirm button.</summary>
+    [Parameter] public string ConfirmText { get; set; } = "Delete";
+
+    [Parameter] public EventCallback OnConfirm { get; set; }
+
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private Task ConfirmAsync() => OnConfirm.InvokeAsync();
+
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+}
