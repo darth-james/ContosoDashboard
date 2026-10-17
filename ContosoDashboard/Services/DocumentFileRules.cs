@@ -67,6 +67,12 @@ public static class DocumentFileRules
     }
 
     /// <summary>
+    /// The previewable canonical MIME types, for EF-translatable queries (a LINQ-to-SQL expression can't call
+    /// <see cref="IsPreviewable"/>). Same source as <see cref="IsPreviewable"/>.
+    /// </summary>
+    public static IReadOnlyList<string> PreviewableMimeTypes { get; } = PreviewableTypes.ToArray();
+
+    /// <summary>
     /// Looks up the lower-case extension and canonical MIME for an allow-listed file name. The extension is taken from
     /// the sanitized name, so "report.pdf.exe" has the extension ".exe" and is rejected.
     /// </summary>

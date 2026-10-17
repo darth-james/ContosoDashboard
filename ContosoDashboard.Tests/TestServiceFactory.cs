@@ -1,5 +1,6 @@
 using ContosoDashboard.Data;
 using ContosoDashboard.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace ContosoDashboard.Tests;
@@ -36,5 +37,27 @@ public static class TestServiceFactory
     public static TaskService CreateTaskService(ApplicationDbContext context)
     {
         return new TaskService(context, CreateNotificationService(context));
+    }
+
+    /// <summary>
+    /// DocumentService over <paramref name="ctx"/> with the real notification and task services. Storage and scanner
+    /// default to a real <see cref="LocalFileStorageService"/> (under a unique temp root; pass the fixture's storage to
+    /// inspect files) and <see cref="SimulatedEicarMalwareScanner"/>.
+    /// </summary>
+    public static DocumentService CreateDocumentService(
+        ApplicationDbContext ctx, IFileStorageService? storage = null, IMalwareScanner? scanner = null)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+
+        storage ??= CreateFileStorage(
+            Path.Combine(Path.GetTempPath(), "ContosoDashboardTests", Guid.NewGuid().ToString("N")));
+
+        return new DocumentService(
+            ctx,
+            storage,
+            scanner ?? CreateScanner(),
+            CreateNotificationService(ctx),
+            CreateTaskService(ctx),
+            NullLogger<DocumentService>.Instance);
     }
 }

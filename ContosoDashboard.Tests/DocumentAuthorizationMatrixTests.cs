@@ -19,12 +19,14 @@ namespace ContosoDashboard.Tests;
 // | Operation                         | Employee               | Team Lead              | Project Manager        | Administrator          |
 // |-----------------------------------|------------------------|------------------------|------------------------|------------------------|
 // | 1  Upload personal document       | N/A (US1: pending)     | N/A (US1: pending)     | N/A (US1: pending)     | N/A (US1: pending)     |
-// | 2  Upload to a project            | DENIAL (US2: pending)  | DENIAL (US2: pending)  | DENIAL (US2: pending)  | N/A (US2: pending)     |
-// | 3  Access a document              | DENIAL (US1/US2/US5:   | DENIAL (US8: pending;  | DENIAL (US2/US8:       | N/A (positive: Access- |
-// |                                   |  pending; foundation:  |  foundation: see       |  pending; foundation:  |  PolicyTests.Adminis-  |
-// |                                   |  see AccessPolicyTests |  AccessPolicyTests     |  see AccessPolicyTests |  trator_CanAccessAnd-  |
-// |                                   |  NonMember_/Another-   |  TeamLeadInAnother-    |  ProjectManagerOf-     |  ManageEverything...)  |
-// |                                   |  Employee_Cannot...)   |  Department_...)       |  AnotherProject_...)   |                        |
+// | 2  Upload to a project            | DENIAL (US1: done;     | DENIAL (US2: pending)  | DENIAL (US2: pending)  | N/A (US2: pending)     |
+// |                                   |  US2: pending)         |                        |                        |                        |
+// | 3  Access a document              | DENIAL (US1: done,     | DENIAL (US8: pending;  | DENIAL (US2/US8:       | N/A (positive: Access- |
+// |                                   |  OwnDocuments; US2/US5:|  foundation: see       |  pending; foundation:  |  PolicyTests.Adminis-  |
+// |                                   |  pending; foundation:  |  AccessPolicyTests     |  see AccessPolicyTests |  trator_CanAccessAnd-  |
+// |                                   |  see AccessPolicyTests |  TeamLeadInAnother-    |  ProjectManagerOf-     |  ManageEverything...)  |
+// |                                   |  NonMember_/Another-   |  Department_...)       |  AnotherProject_...)   |                        |
+// |                                   |  Employee_Cannot...)   |                        |                        |                        |
 // | 4  Edit metadata                  | DENIAL (US4: pending)  | DENIAL (US8: pending)  | DENIAL (US4/US8:       | N/A (US4: pending)     |
 // |                                   |                        |                        |  pending)              |                        |
 // | 5  Replace file                   | DENIAL (US4: pending)  | DENIAL (US4: pending)  | DENIAL (US4: pending)  | DENIAL (US4: pending)  |

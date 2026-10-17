@@ -350,12 +350,12 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
 
 ### Tests for User Story 1 ⚠️ (stubs first, then tests; stub-dependent tests fail at runtime)
 
-- [ ] T133 [US1] Create `ContosoDashboard\Services\DocumentService.cs` with compile-only stubs (stub-first rule):
+- [x] T133 [US1] Create `ContosoDashboard\Services\DocumentService.cs` with compile-only stubs (stub-first rule):
   - **Interface** `IDocumentService` with the US1 members from contracts\service-interfaces.md: `UploadDocumentAsync`, `GetUploadableProjectsAsync`, `GetMyDocumentsAsync`, `GetDocumentAsync`, and `OpenDocumentContentAsync`
   - **Class** `DocumentService` with constructor parameters `ApplicationDbContext`, `IFileStorageService`, `IMalwareScanner`, `INotificationService`, `ITaskService`, and `ILogger<DocumentService>` (stored in fields), and every member body `throw new NotImplementedException()`
 
   **Done when** `dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj` succeeds with no new errors or warnings. T045–T048 replace the bodies.
-- [ ] T040 [P] [US1] Create the test doubles in `ContosoDashboard.Tests\Fakes\TestDoubles.cs`:
+- [x] T040 [P] [US1] Create the test doubles in `ContosoDashboard.Tests\Fakes\TestDoubles.cs`:
   - `ErrorMalwareScanner`: returns `MalwareScanStatus.Error`
   - `ThrowingMalwareScanner`: throws `InvalidOperationException`
   - `CancelingMalwareScanner`: throws `OperationCanceledException`, simulating the about-10-second timeout
@@ -363,9 +363,9 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - `FailingFileStorageService`: wraps a real `LocalFileStorageService`; `UploadAsync` and `DeleteAsync` can each be configured to throw `IOException` (upload failure for T043, delete failure for T077)
   - `ThrowingSaveChangesInterceptor : SaveChangesInterceptor`: throws `DbUpdateException` from `SavingChangesAsync` when armed
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings.
-- [ ] T041 [P] [US1] Add `CreateDocumentService(ApplicationDbContext ctx, IFileStorageService? storage = null, IMalwareScanner? scanner = null)` to `ContosoDashboard.Tests\TestServiceFactory.cs`. It wires `DocumentService` with the real notification service and task service, plus `NullLogger<DocumentService>`.
+- [x] T041 [P] [US1] Add `CreateDocumentService(ApplicationDbContext ctx, IFileStorageService? storage = null, IMalwareScanner? scanner = null)` to `ContosoDashboard.Tests\TestServiceFactory.cs`. It wires `DocumentService` with the real notification service and task service, plus `NullLogger<DocumentService>`.
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings.
-- [ ] T042 [P] [US1] Write `ContosoDashboard.Tests\DocumentUploadTests.cs` (LocalDb collection) against `IDocumentService`:
+- [x] T042 [P] [US1] Write `ContosoDashboard.Tests\DocumentUploadTests.cs` (LocalDb collection) against `IDocumentService`:
   - **Successful upload**: a successful personal upload by Ni Kang (4) stores:
     - `Title` trimmed
     - `Category`
@@ -387,7 +387,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Boundary**: exactly 26,214,400 bytes is accepted.
   - **Download**: `OpenDocumentContentAsync(id, 4, Download)` returns identical bytes, `DownloadFileName` = the original name, `Inline = false`, the stored MIME, and writes one Download activity.
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US1")]` on the class or each method.
-- [ ] T043 [P] [US1] Write `ContosoDashboard.Tests\DocumentWriteOrderTests.cs` (LocalDb collection; partial class, so US4 adds a second file). For each rejection, assert the specific error code, **zero new files** under the fixture storage root, **zero new `Documents` rows**, and no Upload activity (SC-007, FR-011):
+- [x] T043 [P] [US1] Write `ContosoDashboard.Tests\DocumentWriteOrderTests.cs` (LocalDb collection; partial class, so US4 adds a second file). For each rejection, assert the specific error code, **zero new files** under the fixture storage root, **zero new `Documents` rows**, and no Upload activity (SC-007, FR-011):
   - **Size and type**: 26,214,401 bytes → `FileTooLarge`; 0 bytes → `FileEmpty`; `.exe`, `.zip`, `report.pdf.exe`, and no extension → `UnsupportedFileType`.
   - **EICAR**: `EicarTestBytes.WithLeadingLine()` as `eicar-test.txt` → `MalwareDetected`, and the scanner ran **before** any `UploadAsync` call (`RecordingFileStorageService` has no Upload).
   - **Scanner failure** (`ErrorMalwareScanner`, `ThrowingMalwareScanner`, `CancelingMalwareScanner`) → `ScanFailed` (fail closed).
@@ -395,7 +395,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Save failure** (armed `ThrowingSaveChangesInterceptor`) → `StorageFailed`, the file written in step 5 has been **deleted** (compensation), and no row exists.
   - **Ordering**: on success, `UploadAsync` completed before the row became visible.
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US1")]` on each test method.
-- [ ] T044 [P] [US1] Write `ContosoDashboard.Tests\DocumentAuthorizationMatrixTests.OwnDocuments.cs` (partial class). Every denial case:
+- [x] T044 [P] [US1] Write `ContosoDashboard.Tests\DocumentAuthorizationMatrixTests.OwnDocuments.cs` (partial class). Every denial case:
   - **Same-department Employee**: Dana (5) calling `GetDocumentAsync` on Ni Kang's personal document → `null`.
   - **Same response as nonexistent**: `OpenDocumentContentAsync` in Download mode for Dana → `NotFound`, the **same** result shape and message as for document 999999.
   - **Other departments and roles**: Mateo (6), Hana (7), and Rafael (8) → `NotFound` for the same document.
@@ -406,7 +406,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   - **Owner flags**: the owner's `GetDocumentAsync` flags are `CanEditMetadata = CanDelete = CanReplaceFile = CanShare = true`.
   - Update the header comment table (T024) for the cells "Access a document (Employee)" and "Upload a document to a project (Employee)".
   - **Done when**: the solution builds (`dotnet build ContosoDashboard.Tests\ContosoDashboard.Tests.csproj`) with no new errors or warnings, and never with a compile error. New tests that call stubbed members fail at runtime (red) until the implementation tasks replace the stubs; new tests of behavior that is already implemented may pass. Trait: `[Trait("Story", "US1")]` on each test method.
-- [ ] T134 [P] [US1] Write `ContosoDashboard.Tests\DocumentUploadTimingTests.cs` (its own `IClassFixture<LocalDbFixture>`, so it gets a separate database) for SC-001, using the real `LocalFileStorageService` and `SimulatedEicarMalwareScanner` from `TestServiceFactory`:
+- [x] T134 [P] [US1] Write `ContosoDashboard.Tests\DocumentUploadTimingTests.cs` (its own `IClassFixture<LocalDbFixture>`, so it gets a separate database) for SC-001, using the real `LocalFileStorageService` and `SimulatedEicarMalwareScanner` from `TestServiceFactory`:
   - **Warm-up**: one small personal upload first, not timed.
   - **Arrange**: a `MemoryStream` of exactly 26,214,400 bytes named `big.pdf` (a `%PDF-1.4` header followed by filler bytes; no EICAR content).
   - **Assert** (`Stopwatch` around `UploadDocumentAsync` as Ni Kang): the call succeeds and completes in **≤ 30 s** on localhost (SC-001). This measures validation, scanning, storage, and the save; the browser-to-server transfer is checked by hand in quickstart.md §1 step 3.
@@ -414,11 +414,11 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
 
 ### Implementation for User Story 1
 
-- [ ] T045 [US1] Complete `ContosoDashboard\Services\DocumentService.cs` (created with stubs in T133) with the private helpers:
+- [x] T045 [US1] Complete `ContosoDashboard\Services\DocumentService.cs` (created with stubs in T133) with the private helpers:
   - A `ToSummary` projection `Expression<Func<Document, DocumentSummary>>` that sets `IsPreviewable` from `DocumentFileRules`
   - `ApplyPaging(IQueryable<Document>, DocumentQuery)`: default sort `UploadedDate` descending, then `DocumentId`; returns `PagedResult<DocumentSummary>` with `TotalCount`
   - `BuildStorageKey(uploaderId, projectId?, ext)` → `{uploaderId}/{projectId|personal}/{Guid.NewGuid():N}{ext}`
-- [ ] T046 [US1] Implement `UploadDocumentAsync` in `ContosoDashboard\Services\DocumentService.cs` using the R-04 upload order:
+- [x] T046 [US1] Implement `UploadDocumentAsync` in `ContosoDashboard\Services\DocumentService.cs` using the R-04 upload order:
   1. Load `DocumentUserContext` (unknown user → `NotFound`).
   2. Validate the file name, extension, and **stream length**, plus the metadata and tags (`DocumentFileRules`).
   3. If `ProjectId` is set, require `CanUploadToProject`, otherwise return `Forbidden`.
@@ -429,10 +429,10 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
   8. If the save throws, run `DeleteAsync(key)` as best effort (if that also fails, log a warning with the key; the leftover file is never served, spec FR-011), log a warning, and return `StorageFailed`.
 
   Return `DocumentOperationResult.Ok(documentId)`. Log the outcome at Information and rejections at Warning, with the user ID, the sanitized name, and the reason, but never the file contents. Makes T042, T043, T134, and part of T044 pass.
-- [ ] T047 [US1] Implement `GetUploadableProjectsAsync` and `GetMyDocumentsAsync` in `ContosoDashboard\Services\DocumentService.cs`:
+- [x] T047 [US1] Implement `GetUploadableProjectsAsync` and `GetMyDocumentsAsync` in `ContosoDashboard\Services\DocumentService.cs`:
   - **`GetUploadableProjectsAsync`**: returns projects where the requester is a member or the manager, or all projects for an Administrator, as `ProjectOption`s ordered by name.
   - **`GetMyDocumentsAsync`**: `UploadedByUserId == me`, then `ApplyPaging`. The projection goes to SQL, with no N+1 queries.
-- [ ] T048 [US1] Implement `GetDocumentAsync` and `OpenDocumentContentAsync` (Download mode) in `ContosoDashboard\Services\DocumentService.cs`:
+- [x] T048 [US1] Implement `GetDocumentAsync` and `OpenDocumentContentAsync` (Download mode) in `ContosoDashboard\Services\DocumentService.cs`:
   - **`GetDocumentAsync`**:
     - `null` unless `CanAccess`
     - Returns the summary, description, tags, `OriginalFileName`, and `LastModifiedDate`
@@ -443,14 +443,14 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
     - Opens the stream with `IFileStorageService.DownloadAsync`. If the file is missing, log an error and return `StorageFailed`; the endpoint maps that to the same 404.
     - Writes a Download `DocumentActivity` and saves, then returns `Inline = false` and `DownloadFileName = OriginalFileName`.
   - Preview mode returns `UnsupportedFileType` until T069.
-- [ ] T049 [US1] Register `builder.Services.AddScoped<IDocumentService, DocumentService>();` in `ContosoDashboard\Program.cs`, after the T037 registrations.
-- [ ] T050 [P] [US1] Create the Razor Page endpoint `ContosoDashboard\Pages\DocumentDownload.cshtml` (`@page "/documents/{documentId:int}/download"`, `@model DocumentDownloadModel`) and `ContosoDashboard\Pages\DocumentDownload.cshtml.cs` (http-endpoints.md):
+- [x] T049 [US1] Register `builder.Services.AddScoped<IDocumentService, DocumentService>();` in `ContosoDashboard\Program.cs`, after the T037 registrations.
+- [x] T050 [P] [US1] Create the Razor Page endpoint `ContosoDashboard\Pages\DocumentDownload.cshtml` (`@page "/documents/{documentId:int}/download"`, `@model DocumentDownloadModel`) and `ContosoDashboard\Pages\DocumentDownload.cshtml.cs` (http-endpoints.md):
   - `[Authorize]` on the PageModel.
   - Parse `ClaimTypes.NameIdentifier`. If it's missing or invalid, return 404.
   - Call `OpenDocumentContentAsync(id, userId, Download)`.
   - On success, set `Response.Headers.CacheControl = "private, no-store"` and return `File(stream, contentType, fileDownloadName)`.
   - On any failure, return `NotFound("Document not found or not available.")` as text/plain, with the identical body for every case.
-- [ ] T051 [P] [US1] Create `ContosoDashboard\Shared\DocumentList.razor` (ui-routes.md "DocumentList"):
+- [x] T051 [P] [US1] Create `ContosoDashboard\Shared\DocumentList.razor` (ui-routes.md "DocumentList"):
   - **Parameters**: `Items`, `Query`, `OnQueryChanged`, `ShowProjectFilter`, `ShowUploader`, `ProjectOptions`, and `EmptyMessage` (default "No documents found.")
   - **Table**:
     - Title, linking to `/documents/{id}`
@@ -462,7 +462,7 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
     - A Download link: `<a href="/documents/{id}/download" download>`
   - **Paging**: Previous and Next controls that raise `OnQueryChanged`. "Loading…" is shown while `Items` is null.
   - Sort and filter controls come in T071.
-- [ ] T052 [P] [US1] Create `ContosoDashboard\Shared\DocumentUploadForm.razor` (R-07, ui-routes.md "DocumentUploadForm"):
+- [x] T052 [P] [US1] Create `ContosoDashboard\Shared\DocumentUploadForm.razor` (R-07, ui-routes.md "DocumentUploadForm"):
   - **Parameters**: `FixedProjectId`, `TaskId`, `TaskProjectId`, `OnUploaded`
   - **File selection**: `<InputFile multiple @key="inputKey">` with `e.GetMultipleFiles(maximumFileCount: 10)`. Capture `Name`, `Size`, and `ContentType` into one `PendingUpload` row per file.
   - **Batch limit (FR-001)**: catch the `InvalidOperationException` that `GetMultipleFiles` throws when more than 10 files are selected. Add no rows, show `DocumentMessages` "You can upload up to 10 files at a time. Select 10 or fewer files.", and let the user select again. The exception must never surface as an unhandled circuit error.
@@ -483,19 +483,19 @@ As Dana Whitfield, `/documents/{D1}` and `/documents/{D1}/download` return "Docu
     3. Set `Position = 0` and clear the `IBrowserFile` reference.
     4. Call `UploadDocumentAsync` with `userId` from the `NameIdentifier` claim, and `TaskId` when set.
   - **Results**: show each row's success message ("'{name}' was uploaded.") or error message from `DocumentMessages`. Increment `inputKey` after the batch, then invoke `OnUploaded`.
-- [ ] T053 [US1] Create `ContosoDashboard\Pages\Documents.razor` (`@page "/documents"`, `@attribute [Authorize]`):
+- [x] T053 [US1] Create `ContosoDashboard\Pages\Documents.razor` (`@page "/documents"`, `@attribute [Authorize]`):
   - Header "My Documents", with one **Upload** button that toggles the `DocumentUploadForm`. That's 3 clicks: Upload, choose file, Submit (SC-005).
   - A `DocumentList` bound to `GetMyDocumentsAsync` with paging, and `EmptyMessage` = "You haven't uploaded any documents yet."
   - Reload the list in `OnUploaded`.
   - Get the user ID from the `NameIdentifier` claim, as existing pages do.
   - Depends on T051 and T052.
-- [ ] T054 [P] [US1] Create `ContosoDashboard\Pages\DocumentDetails.razor` (`@page "/documents/{DocumentId:int}"`, `@attribute [Authorize]`):
+- [x] T054 [P] [US1] Create `ContosoDashboard\Pages\DocumentDetails.razor` (`@page "/documents/{DocumentId:int}"`, `@attribute [Authorize]`):
   - Calls `GetDocumentAsync`.
   - If the result is `null`, shows "Document not found or not available."
   - Otherwise shows the title, category, description, tags, project, uploader, upload and last-modified dates, original file name, size, and type, plus a Download button (`<a href="/documents/{id}/download" download>`).
   - Leave placeholder sections for the actions that later stories add, gated by the `Can*` flags.
-- [ ] T055 [P] [US1] Add a **Documents** item (`/documents`, icon `bi-file-earmark-text`, visible to all signed-in users) to `ContosoDashboard\Shared\NavMenu.razor` (ui-routes.md "NavMenu additions").
-- [ ] T056 [US1] Verify US1 end to end with `ContosoDashboard.Tests\` and `specs\001-document-upload-management\quickstart.md` §1:
+- [x] T055 [P] [US1] Add a **Documents** item (`/documents`, icon `bi-file-earmark-text`, visible to all signed-in users) to `ContosoDashboard\Shared\NavMenu.razor` (ui-routes.md "NavMenu additions").
+- [x] T056 [US1] Verify US1 end to end with `ContosoDashboard.Tests\` and `specs\001-document-upload-management\quickstart.md` §1:
   - `dotnet test ContosoDashboard.Tests --filter "Story=US1"` passes (including the SC-001 timing test T134), and `--filter "Story=Foundation"` still passes.
   - **Routing (re-verifies T038)**:
     - `/documents/{id}/download` returns the file, not Blazor's "Not found".
