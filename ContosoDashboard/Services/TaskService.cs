@@ -67,7 +67,7 @@ public class TaskService : ITaskService
             .Include(t => t.AssignedUser)
             .Include(t => t.CreatedByUser)
             .Include(t => t.Project)
-            .ThenInclude(p => p.ProjectMembers)
+            .ThenInclude(p => p!.ProjectMembers)
             .Include(t => t.Comments)
             .ThenInclude(c => c.User)
             .FirstOrDefaultAsync(t => t.TaskId == taskId);
@@ -113,7 +113,7 @@ public class TaskService : ITaskService
     {
         var task = await _context.Tasks
             .Include(t => t.Project)
-            .ThenInclude(p => p.ProjectMembers)
+            .ThenInclude(p => p!.ProjectMembers)
             .FirstOrDefaultAsync(t => t.TaskId == taskId);
             
         if (task == null) return false;
@@ -187,7 +187,7 @@ public class TaskService : ITaskService
     {
         var task = await _context.Tasks
             .Include(t => t.Project)
-            .ThenInclude(p => p.ProjectMembers)
+            .ThenInclude(p => p!.ProjectMembers)
             .FirstOrDefaultAsync(t => t.TaskId == taskId);
 
         if (task == null) return new List<TaskComment>();
