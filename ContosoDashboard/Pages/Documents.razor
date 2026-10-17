@@ -1,0 +1,74 @@
+@page "/documents"
+@using ContosoDashboard.Services
+@using System.Security.Claims
+@attribute [Authorize]
+@inject IDocumentService DocumentService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>My Documents - ContosoDashboard</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>My Documents</h1>
+        </div>
+        <div class="col-auto">
+            @* One Upload button: Upload, choose file, Submit = 3 clicks (SC-005). *@
+            <button type="button" class="btn btn-primary" @onclick="ToggleUpload">
+                <span class="bi bi-upload" aria-hidden="true"></span> Upload
+            </button>
+        </div>
+    </div>
+
+    @if (showUpload)
+    {
+        <DocumentUploadForm OnUploaded="OnUploadedAsync" />
+    }
+
+    <DocumentList Items="items"
+                  Query="query"
+                  OnQueryChanged="OnQueryChangedAsync"
+                  EmptyMessage="@DocumentMessages.EmptyMyDocuments" />
+</div>
+
+@code {
+    private PagedResult<DocumentSummary>? items;
+    private DocumentQuery query = new();
+    private bool showUpload;
+    private int currentUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+        {
+            currentUserId = userId;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (currentUserId > 0)
+        {
+            items = await DocumentService.GetMyDocumentsAsync(currentUserId, query);
+        }
+    }
+
+    private void ToggleUpload() => showUpload = !showUpload;
+
+    private async Task OnUploadedAsync(IReadOnlyList<DocumentOperationResult> results)
+    {
+        // Show the new document at the top: go back to page 1, newest first.
+        query = new DocumentQuery { PageSize = query.PageSize };
+        await LoadAsync();
+    }
+
+    private async Task OnQueryChangedAsync(DocumentQuery newQuery)
+    {
+        query = newQuery;
+        await LoadAsync();
+    }
+}

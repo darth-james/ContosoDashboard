@@ -29,6 +29,9 @@ public class Notification
 
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
+    // Optional link to a document (no FK and no navigation, so the notification survives document deletion)
+    public int? DocumentId { get; set; }
+
     // Navigation properties
     [ForeignKey("UserId")]
     public virtual User User { get; set; } = null!;
@@ -42,7 +45,9 @@ public enum NotificationType
     TaskCompleted,
     TaskComment,
     ProjectUpdate,
-    SystemAnnouncement
+    SystemAnnouncement,
+    DocumentShared,
+    DocumentAdded
 }
 
 public enum NotificationPriority

@@ -62,6 +62,12 @@ namespace ContosoDashboard.Pages
                     new Claim(ClaimTypes.Role, user.Role.ToString())
                 };
 
+                // Department claim: for display and UI hints only. Services authorize from the database (R-09).
+                if (!string.IsNullOrEmpty(user.Department))
+                {
+                    claims.Add(new Claim("Department", user.Department));
+                }
+
                 var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                 var authProperties = new AuthenticationProperties
                 {

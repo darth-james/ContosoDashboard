@@ -1,0 +1,389 @@
+@using ContosoDashboard.Models
+@using ContosoDashboard.Services
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@inject IDocumentService DocumentService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@* Upload form (research R-07, ui-routes.md "DocumentUploadForm").
+   Selecting files only captures the IBrowserFile references and their metadata; no stream is opened before Submit.
+   On Submit rows are processed one at a time. For each row, the content is copied into a MemoryStream at the very start
+   of that row's processing (before any other await for the row), then the IBrowserFile reference is cleared. *@
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Upload documents</h5>
+        <p class="text-muted small mb-3">
+            Up to 10 files at a time, 25 MB each. Supported types: @DocumentFileRules.SupportedTypesDescription.
+        </p>
+
+        <div class="mb-3">
+            <label class="form-label" for="document-files">Choose files</label>
+            <InputFile id="document-files" class="form-control" multiple @key="inputKey" OnChange="OnFilesSelected" disabled="@processing" />
+        </div>
+
+        @if (tooManyFilesMessage != null)
+        {
+            <div class="alert alert-warning" role="alert">@tooManyFilesMessage</div>
+        }
+
+        @foreach (var row in rows)
+        {
+            <div class="border rounded p-3 mb-3" @key="row.Id">
+                <div class="d-flex justify-content-between">
+                    <strong>@row.Name</strong>
+                    <span class="text-muted small">@FormatSize(row.Size)</span>
+                </div>
+
+                @if (row.ClientError != null)
+                {
+                    <div class="alert alert-danger mt-2 mb-0" role="alert">@row.ClientError</div>
+                }
+                else
+                {
+                    var editable = !processing && !row.Done;
+                    <div class="row g-2 mt-1">
+                        <div class="col-md-6">
+                            <label class="form-label" for="title-@row.Id">Title <span class="text-danger">*</span></label>
+                            <input id="title-@row.Id" class="form-control @(editable && !TitleValid(row) ? "is-invalid" : "")"
+                                   maxlength="200" disabled="@(!editable)"
+                                   @bind="row.Title" @bind:event="oninput" />
+                            <div class="invalid-feedback">@DocumentMessages.TitleInvalid</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="category-@row.Id">Category <span class="text-danger">*</span></label>
+                            <select id="category-@row.Id" class="form-select @(editable && !CategoryValid(row) ? "is-invalid" : "")"
+                                    disabled="@(!editable)" @bind="row.Category">
+                                <option value="">Select a category…</option>
+                                @foreach (var category in DocumentCategories.All)
+                                {
+                                    <option value="@category">@category</option>
+                                }
+                            </select>
+                            <div class="invalid-feedback">@DocumentMessages.CategoryInvalid</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="description-@row.Id">Description</label>
+                            <textarea id="description-@row.Id" class="form-control @(editable && !DescriptionValid(row) ? "is-invalid" : "")"
+                                      rows="2" disabled="@(!editable)"
+                                      @bind="row.Description" @bind:event="oninput"></textarea>
+                            <div class="invalid-feedback">@DocumentMessages.DescriptionTooLong</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="tags-@row.Id">Tags (comma-separated)</label>
+                            <input id="tags-@row.Id" class="form-control @(editable && TagsError(row) != null ? "is-invalid" : "")"
+                                   disabled="@(!editable)"
+                                   @bind="row.TagsText" @bind:event="oninput" />
+                            <div class="invalid-feedback">@TagsError(row)</div>
+                        </div>
+                        <div class="col-md-6">
+                            @if (TaskId.HasValue && TaskProjectId.HasValue)
+                            {
+                                <label class="form-label">Project</label>
+                                <div class="form-control-plaintext">Project: @ProjectName(TaskProjectId.Value) (from the task)</div>
+                            }
+                            else if (FixedProjectId.HasValue)
+                            {
+                                <label class="form-label">Project</label>
+                                <div class="form-control-plaintext">@ProjectName(FixedProjectId.Value)</div>
+                            }
+                            else
+                            {
+                                <label class="form-label" for="project-@row.Id">Project</label>
+                                <select id="project-@row.Id" class="form-select" disabled="@(!editable)" @bind="row.ProjectId">
+                                    <option value="">None (personal document)</option>
+                                    @foreach (var project in projects)
+                                    {
+                                        <option value="@project.ProjectId">@project.Name</option>
+                                    }
+                                </select>
+                            }
+                        </div>
+                    </div>
+
+                    @if (row.Processing || (row.Done && row.Succeeded == true))
+                    {
+                        <div class="progress mt-2" role="progressbar" aria-valuenow="@row.Progress" aria-valuemin="0" aria-valuemax="100">
+                            <div class="progress-bar @(row.Succeeded == true ? "bg-success" : "")" style="width: @(row.Progress)%">@(row.Progress)%</div>
+                        </div>
+                    }
+
+                    @if (row.ResultMessage != null)
+                    {
+                        <div class="alert @(row.Succeeded == true ? "alert-success" : "alert-danger") mt-2 mb-0" role="alert">@row.ResultMessage</div>
+                    }
+                }
+            </div>
+        }
+
+        @if (rows.Count > 0)
+        {
+            <button type="button" class="btn btn-primary" disabled="@(!CanSubmit)" @onclick="SubmitAsync">
+                <span class="bi bi-upload" aria-hidden="true"></span> Submit
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>Pre-selects a project and locks it (project page).</summary>
+    [Parameter] public int? FixedProjectId { get; set; }
+
+    /// <summary>Upload-from-task. The service forces the task's project.</summary>
+    [Parameter] public int? TaskId { get; set; }
+
+    /// <summary>Set with <see cref="TaskId"/> when the task belongs to a project: the project selector is then hidden.</summary>
+    [Parameter] public int? TaskProjectId { get; set; }
+
+    [Parameter] public EventCallback<IReadOnlyList<DocumentOperationResult>> OnUploaded { get; set; }
+
+    private const int MaxFilesPerBatch = 10;
+
+    private sealed class PendingUpload
+    {
+        public int Id { get; init; }
+        public IBrowserFile? File { get; set; }
+        public string Name { get; init; } = string.Empty;
+        public long Size { get; init; }
+        public string ContentType { get; init; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string TagsText { get; set; } = string.Empty;
+        public string? ProjectId { get; set; }
+        public string? ClientError { get; set; }
+        public DocumentErrorCode ClientErrorCode { get; set; }
+        public bool Processing { get; set; }
+        public bool Done { get; set; }
+        public bool? Succeeded { get; set; }
+        public string? ResultMessage { get; set; }
+        public int Progress { get; set; }
+    }
+
+    private readonly List<PendingUpload> rows = new();
+    private List<ProjectOption> projects = new();
+    private object inputKey = new();
+    private bool processing;
+    private string? tooManyFilesMessage;
+    private int userId;
+    private int nextRowId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var claim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+        if (claim != null && int.TryParse(claim.Value, out var id))
+        {
+            userId = id;
+            projects = await DocumentService.GetUploadableProjectsAsync(userId);
+        }
+    }
+
+    private bool CanSubmit =>
+        !processing
+        && userId > 0
+        && rows.Any(r => r.ClientError == null && !r.Done)
+        && rows.Where(r => r.ClientError == null && !r.Done).All(RowValid);
+
+    private bool TitleValid(PendingUpload row)
+    {
+        var length = row.Title?.Trim().Length ?? 0;
+        return length >= 1 && length <= 200;
+    }
+
+    private bool CategoryValid(PendingUpload row) => DocumentCategories.IsValid(row.Category);
+
+    private bool DescriptionValid(PendingUpload row) => (row.Description?.Trim().Length ?? 0) <= 2000;
+
+    private string? TagsError(PendingUpload row) => DocumentFileRules.NormalizeTags(ParseTags(row.TagsText)).Error;
+
+    private bool RowValid(PendingUpload row) =>
+        TitleValid(row) && CategoryValid(row) && DescriptionValid(row) && TagsError(row) == null;
+
+    private static List<string> ParseTags(string? text) =>
+        (text ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+    private string ProjectName(int projectId) =>
+        projects.FirstOrDefault(p => p.ProjectId == projectId)?.Name ?? $"#{projectId}";
+
+    private void OnFilesSelected(InputFileChangeEventArgs e)
+    {
+        tooManyFilesMessage = null;
+
+        IReadOnlyList<IBrowserFile> files;
+        try
+        {
+            files = e.GetMultipleFiles(maximumFileCount: MaxFilesPerBatch);
+        }
+        catch (InvalidOperationException)
+        {
+            // More than 10 files: no rows are added, and the user can select again (FR-001).
+            rows.Clear();
+            tooManyFilesMessage = DocumentMessages.TooManyFiles;
+            inputKey = new object();
+            return;
+        }
+
+        rows.Clear();
+        foreach (var file in files)
+        {
+            var displayName = DocumentFileRules.SanitizeFileName(file.Name);
+            var row = new PendingUpload
+            {
+                Id = ++nextRowId,
+                File = file,                       // only the reference is held until Submit
+                Name = displayName,
+                Size = file.Size,
+                ContentType = file.ContentType,
+                Title = Path.GetFileNameWithoutExtension(displayName)
+            };
+
+            // Client pre-checks (the server repeats every rule).
+            if (file.Size <= 0)
+            {
+                row.ClientErrorCode = DocumentErrorCode.FileEmpty;
+                row.ClientError = DocumentMessages.FileEmpty(displayName);
+            }
+            else if (file.Size > DocumentFileRules.MaxFileSizeBytes)
+            {
+                row.ClientErrorCode = DocumentErrorCode.FileTooLarge;
+                row.ClientError = DocumentMessages.FileTooLarge(displayName);
+            }
+            else if (!DocumentFileRules.TryGetFileType(displayName, out _, out _))
+            {
+                row.ClientErrorCode = DocumentErrorCode.UnsupportedFileType;
+                row.ClientError = DocumentMessages.UnsupportedFileType(displayName);
+            }
+
+            if (row.ClientError != null)
+            {
+                row.File = null;
+                row.Done = true;
+                row.Succeeded = false;
+            }
+
+            rows.Add(row);
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (!CanSubmit)
+        {
+            return;
+        }
+
+        processing = true;
+        var all = new List<DocumentOperationResult>();
+
+        // Files the client already rejected are part of the batch result, so every file gets a result.
+        foreach (var rejected in rows.Where(r => r.ClientError != null))
+        {
+            all.Add(DocumentOperationResult.Fail(rejected.ClientErrorCode, rejected.ClientError!));
+        }
+
+        foreach (var row in rows.Where(r => r.ClientError == null && !r.Done).ToList())
+        {
+            all.Add(await ProcessRowAsync(row));
+        }
+
+        processing = false;
+        inputKey = new object();           // resets the InputFile so the same files can be selected again
+        await OnUploaded.InvokeAsync(all);
+    }
+
+    private async Task<DocumentOperationResult> ProcessRowAsync(PendingUpload row)
+    {
+        row.Processing = true;
+        row.Progress = 0;
+        row.ResultMessage = null;
+
+        MemoryStream? buffer = null;
+        try
+        {
+            // Steps 1-3 run first, before any other await for this row.
+            // 1. Open the browser file (the limit is enforced by the framework as well).
+            using (var input = row.File!.OpenReadStream(DocumentFileRules.MaxFileSizeBytes))
+            {
+                // 2. Copy into a MemoryStream in 81,920-byte chunks, updating the progress bar about every 5%.
+                buffer = new MemoryStream();
+                var chunk = new byte[81920];
+                long copied = 0;
+                var reported = 0;
+                int read;
+                while ((read = await input.ReadAsync(chunk.AsMemory(0, chunk.Length))) > 0)
+                {
+                    buffer.Write(chunk, 0, read);
+                    copied += read;
+
+                    var percent = row.Size > 0 ? (int)Math.Min(100, copied * 100 / row.Size) : 0;
+                    if (percent >= reported + 5)
+                    {
+                        reported = percent;
+                        row.Progress = percent;
+                        StateHasChanged();
+                    }
+                }
+            }
+
+            // 3. Rewind and drop the IBrowserFile reference.
+            buffer.Position = 0;
+            row.File = null;
+
+            // 4. Upload through the service as the signed-in user.
+            var projectId = TaskId.HasValue && TaskProjectId.HasValue
+                ? TaskProjectId
+                : FixedProjectId ?? (int.TryParse(row.ProjectId, out var chosen) ? chosen : (int?)null);
+
+            var request = new DocumentUploadRequest(
+                row.Name, row.Title, row.Category, row.Description, projectId, ParseTags(row.TagsText), TaskId);
+
+            var result = await DocumentService.UploadDocumentAsync(request, buffer, userId);
+
+            row.Succeeded = result.Succeeded;
+            row.Progress = result.Succeeded ? 100 : row.Progress;
+            row.ResultMessage = result.Succeeded
+                ? DocumentMessages.Uploaded(row.Name)
+                : (string.IsNullOrEmpty(result.Message) ? DocumentMessages.ForCode(result.Error, row.Name) : result.Message);
+            return result;
+        }
+        catch (Exception)
+        {
+            // Never show internals: the service logged the details, and reading the browser file can fail on a dropped circuit.
+            row.File = null;
+            row.Succeeded = false;
+            row.ResultMessage = DocumentMessages.StorageFailed;
+            return DocumentOperationResult.Fail(DocumentErrorCode.StorageFailed, DocumentMessages.StorageFailed);
+        }
+        finally
+        {
+            if (buffer != null)
+            {
+                await buffer.DisposeAsync();
+            }
+
+            row.Processing = false;
+            row.Done = true;
+            StateHasChanged();
+        }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        const double kb = 1024;
+        const double mb = kb * 1024;
+
+        if (bytes >= mb)
+        {
+            return $"{bytes / mb:0.#} MB";
+        }
+
+        if (bytes >= kb)
+        {
+            return $"{bytes / kb:0.#} KB";
+        }
+
+        return $"{bytes} bytes";
+    }
+}

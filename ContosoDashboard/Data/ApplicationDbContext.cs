@@ -17,6 +17,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<Notification> Notifications { get; set; } = null!;
     public DbSet<ProjectMember> ProjectMembers { get; set; } = null!;
     public DbSet<Announcement> Announcements { get; set; } = null!;
+    public DbSet<Document> Documents { get; set; } = null!;
+    public DbSet<DocumentTag> DocumentTags { get; set; } = null!;
+    public DbSet<DocumentShare> DocumentShares { get; set; } = null!;
+    public DbSet<TaskDocument> TaskDocuments { get; set; } = null!;
+    public DbSet<DocumentActivity> DocumentActivities { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,8 +69,152 @@ public class ApplicationDbContext : DbContext
             .HasIndex(u => u.Email)
             .IsUnique();
 
+        ConfigureDocuments(modelBuilder);
+
         // Seed initial data
         SeedData(modelBuilder);
+    }
+
+    private static void ConfigureDocuments(ModelBuilder modelBuilder)
+    {
+        // Document relationships. Every relationship from Users and Projects is Restrict,
+        // which rules out "multiple cascade paths" errors on SQL Server.
+        modelBuilder.Entity<Document>()
+            .HasOne(d => d.UploadedByUser)
+            .WithMany()
+            .HasForeignKey(d => d.UploadedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Document>()
+            .HasOne(d => d.Project)
+            .WithMany(p => p.Documents)
+            .HasForeignKey(d => d.ProjectId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<DocumentTag>()
+            .HasOne(t => t.Document)
+            .WithMany(d => d.Tags)
+            .HasForeignKey(t => t.DocumentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DocumentShare>()
+            .HasOne(s => s.Document)
+            .WithMany(d => d.Shares)
+            .HasForeignKey(s => s.DocumentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DocumentShare>()
+            .HasOne(s => s.SharedByUser)
+            .WithMany()
+            .HasForeignKey(s => s.SharedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<DocumentShare>()
+            .HasOne(s => s.SharedWithUser)
+            .WithMany()
+            .HasForeignKey(s => s.SharedWithUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<TaskDocument>()
+            .HasOne(td => td.Task)
+            .WithMany(t => t.DocumentAttachments)
+            .HasForeignKey(td => td.TaskId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<TaskDocument>()
+            .HasOne(td => td.Document)
+            .WithMany(d => d.TaskAttachments)
+            .HasForeignKey(td => td.DocumentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<TaskDocument>()
+            .HasOne(td => td.AttachedByUser)
+            .WithMany()
+            .HasForeignKey(td => td.AttachedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<DocumentActivity>()
+            .HasOne(a => a.User)
+            .WithMany()
+            .HasForeignKey(a => a.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // DocumentActivity.DocumentId, DocumentActivity.TaskId and Notification.DocumentId
+        // intentionally have no relationship: the audit record and the notification survive deletion.
+
+        // Document indexes
+        modelBuilder.Entity<Document>()
+            .HasIndex(d => new { d.UploadedByUserId, d.UploadedDate })
+            .IsDescending(false, true)
+            .HasDatabaseName("IX_Documents_UploadedByUserId_UploadedDate");
+
+        modelBuilder.Entity<Document>()
+            .HasIndex(d => d.ProjectId)
+            .HasDatabaseName("IX_Documents_ProjectId");
+
+        modelBuilder.Entity<Document>()
+            .HasIndex(d => d.Category)
+            .HasDatabaseName("IX_Documents_Category");
+
+        modelBuilder.Entity<Document>()
+            .HasIndex(d => d.UploadedDate)
+            .HasDatabaseName("IX_Documents_UploadedDate");
+
+        modelBuilder.Entity<Document>()
+            .HasIndex(d => d.FilePath)
+            .IsUnique()
+            .HasDatabaseName("IX_Documents_FilePath");
+
+        // DocumentTag indexes
+        modelBuilder.Entity<DocumentTag>()
+            .HasIndex(t => new { t.DocumentId, t.Tag })
+            .IsUnique();
+
+        modelBuilder.Entity<DocumentTag>()
+            .HasIndex(t => t.Tag);
+
+        // DocumentShare indexes and constraint
+        modelBuilder.Entity<DocumentShare>()
+            .HasIndex(s => new { s.DocumentId, s.SharedWithUserId })
+            .IsUnique()
+            .HasFilter("[SharedWithUserId] IS NOT NULL");
+
+        modelBuilder.Entity<DocumentShare>()
+            .HasIndex(s => new { s.DocumentId, s.SharedWithDepartment })
+            .IsUnique()
+            .HasFilter("[SharedWithDepartment] IS NOT NULL");
+
+        modelBuilder.Entity<DocumentShare>()
+            .HasIndex(s => s.SharedWithUserId);
+
+        modelBuilder.Entity<DocumentShare>()
+            .HasIndex(s => s.SharedWithDepartment);
+
+        modelBuilder.Entity<DocumentShare>()
+            .ToTable(t => t.HasCheckConstraint(
+                "CK_DocumentShares_SingleTarget",
+                "([SharedWithUserId] IS NOT NULL AND [SharedWithDepartment] IS NULL) OR ([SharedWithUserId] IS NULL AND [SharedWithDepartment] IS NOT NULL)"));
+
+        // TaskDocument indexes
+        modelBuilder.Entity<TaskDocument>()
+            .HasIndex(td => new { td.TaskId, td.DocumentId })
+            .IsUnique();
+
+        modelBuilder.Entity<TaskDocument>()
+            .HasIndex(td => td.DocumentId);
+
+        // DocumentActivity indexes
+        modelBuilder.Entity<DocumentActivity>()
+            .HasIndex(a => a.OccurredAt);
+
+        modelBuilder.Entity<DocumentActivity>()
+            .HasIndex(a => new { a.Action, a.OccurredAt });
+
+        modelBuilder.Entity<DocumentActivity>()
+            .HasIndex(a => a.DocumentId);
+
+        modelBuilder.Entity<DocumentActivity>()
+            .HasIndex(a => a.UserId);
     }
 
     private void SeedData(ModelBuilder modelBuilder)
@@ -123,6 +272,58 @@ public class ApplicationDbContext : DbContext
                 CreatedDate = DateTime.UtcNow,
                 EmailNotificationsEnabled = true,
                 InAppNotificationsEnabled = true
+            },
+            new User
+            {
+                UserId = 5,
+                Email = "dana.whitfield@contoso.com",
+                DisplayName = "Dana Whitfield",
+                Department = "Engineering",
+                JobTitle = "Software Engineer",
+                Role = UserRole.Employee,
+                AvailabilityStatus = AvailabilityStatus.Available,
+                CreatedDate = DateTime.UtcNow,
+                EmailNotificationsEnabled = true,
+                InAppNotificationsEnabled = true
+            },
+            new User
+            {
+                UserId = 6,
+                Email = "mateo.alvarez@contoso.com",
+                DisplayName = "Mateo Alvarez",
+                Department = "Marketing",
+                JobTitle = "Marketing Specialist",
+                Role = UserRole.Employee,
+                AvailabilityStatus = AvailabilityStatus.Available,
+                CreatedDate = DateTime.UtcNow,
+                EmailNotificationsEnabled = true,
+                InAppNotificationsEnabled = true
+            },
+            new User
+            {
+                UserId = 7,
+                Email = "hana.sato@contoso.com",
+                DisplayName = "Hana Sato",
+                Department = "Marketing",
+                JobTitle = "Team Lead",
+                Role = UserRole.TeamLead,
+                AvailabilityStatus = AvailabilityStatus.Available,
+                CreatedDate = DateTime.UtcNow,
+                EmailNotificationsEnabled = true,
+                InAppNotificationsEnabled = true
+            },
+            new User
+            {
+                UserId = 8,
+                Email = "rafael.costa@contoso.com",
+                DisplayName = "Rafael Costa",
+                Department = "Marketing",
+                JobTitle = "Project Manager",
+                Role = UserRole.ProjectManager,
+                AvailabilityStatus = AvailabilityStatus.Available,
+                CreatedDate = DateTime.UtcNow,
+                EmailNotificationsEnabled = true,
+                InAppNotificationsEnabled = true
             }
         );
 
@@ -138,6 +339,18 @@ public class ApplicationDbContext : DbContext
                 TargetCompletionDate = DateTime.UtcNow.AddDays(60),
                 Status = ProjectStatus.Active,
                 CreatedDate = DateTime.UtcNow.AddDays(-30),
+                UpdatedDate = DateTime.UtcNow
+            },
+            new Project
+            {
+                ProjectId = 2,
+                Name = "Marketing Website Refresh",
+                Description = "Refresh of the public marketing website",
+                ProjectManagerId = 8,
+                StartDate = DateTime.UtcNow.AddDays(-10),
+                TargetCompletionDate = DateTime.UtcNow.AddDays(50),
+                Status = ProjectStatus.Active,
+                CreatedDate = DateTime.UtcNow.AddDays(-10),
                 UpdatedDate = DateTime.UtcNow
             }
         );
@@ -185,6 +398,34 @@ public class ApplicationDbContext : DbContext
                 ProjectId = 1,
                 CreatedDate = DateTime.UtcNow.AddDays(-20),
                 UpdatedDate = DateTime.UtcNow.AddDays(-20)
+            },
+            new TaskItem
+            {
+                TaskId = 4,
+                Title = "Prepare onboarding checklist",
+                Description = "Personal task that belongs to no project",
+                Priority = TaskPriority.Medium,
+                Status = Models.TaskStatus.NotStarted,
+                DueDate = DateTime.UtcNow.AddDays(7),
+                AssignedUserId = 4,
+                CreatedByUserId = 3,
+                ProjectId = null,
+                CreatedDate = DateTime.UtcNow.AddDays(-2),
+                UpdatedDate = DateTime.UtcNow.AddDays(-2)
+            },
+            new TaskItem
+            {
+                TaskId = 5,
+                Title = "Draft launch copy",
+                Description = "Write the launch copy for the refreshed marketing website",
+                Priority = TaskPriority.Medium,
+                Status = Models.TaskStatus.NotStarted,
+                DueDate = DateTime.UtcNow.AddDays(14),
+                AssignedUserId = 6,
+                CreatedByUserId = 8,
+                ProjectId = 2,
+                CreatedDate = DateTime.UtcNow.AddDays(-2),
+                UpdatedDate = DateTime.UtcNow.AddDays(-2)
             }
         );
 
@@ -205,6 +446,14 @@ public class ApplicationDbContext : DbContext
                 UserId = 4,
                 Role = "Developer",
                 AssignedDate = DateTime.UtcNow.AddDays(-30)
+            },
+            new ProjectMember
+            {
+                ProjectMemberId = 3,
+                ProjectId = 2,
+                UserId = 6,
+                Role = "Developer",
+                AssignedDate = DateTime.UtcNow.AddDays(-10)
             }
         );
 

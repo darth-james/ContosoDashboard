@@ -1,0 +1,130 @@
+@using ContosoDashboard.Services
+
+@* Shared document table (ui-routes.md "DocumentList"). Sort and filter controls arrive with US3 (T071). *@
+
+@if (Items == null)
+{
+    <p><em>Loading…</em></p>
+}
+else if (Items.Items.Count == 0)
+{
+    <div class="alert alert-info">@(EmptyMessage ?? DocumentMessages.EmptyDefault)</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Title</th>
+                    <th scope="col">Category</th>
+                    <th scope="col">Uploaded (UTC)</th>
+                    <th scope="col">Size</th>
+                    <th scope="col">Project</th>
+                    @if (ShowUploader)
+                    {
+                        <th scope="col">Uploaded by</th>
+                    }
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Items.Items)
+                {
+                    <tr>
+                        <td><a href="/documents/@item.DocumentId">@item.Title</a></td>
+                        <td>@item.Category</td>
+                        <td>@item.UploadedDate.ToString("MMM dd, yyyy")</td>
+                        <td>@FormatSize(item.FileSizeBytes)</td>
+                        <td>@(item.ProjectName ?? "—")</td>
+                        @if (ShowUploader)
+                        {
+                            <td>@item.UploadedByName</td>
+                        }
+                        <td class="text-end">
+                            @* A plain link with the download attribute stops the Blazor router from intercepting it. *@
+                            <a class="btn btn-outline-primary btn-sm" href="/documents/@item.DocumentId/download" download>
+                                <span class="bi bi-download" aria-hidden="true"></span> Download
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center">
+        <small class="text-muted">@Items.TotalCount document@(Items.TotalCount == 1 ? "" : "s")</small>
+        @if (TotalPages > 1)
+        {
+            <div>
+                <button type="button" class="btn btn-outline-secondary btn-sm me-2" disabled="@(Items.Page <= 1)"
+                        @onclick="() => GoToPageAsync(Items.Page - 1)">Previous</button>
+                <span class="mx-2">Page @Items.Page of @TotalPages</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@(Items.Page >= TotalPages)"
+                        @onclick="() => GoToPageAsync(Items.Page + 1)">Next</button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>Data. Null shows "Loading…".</summary>
+    [Parameter] public PagedResult<DocumentSummary>? Items { get; set; }
+
+    /// <summary>Current filter, sort and page.</summary>
+    [Parameter] public DocumentQuery Query { get; set; } = new();
+
+    /// <summary>Raised on a page change (and, in later stories, on sort and filter changes).</summary>
+    [Parameter] public EventCallback<DocumentQuery> OnQueryChanged { get; set; }
+
+    [Parameter] public bool ShowProjectFilter { get; set; }
+    [Parameter] public bool ShowUploader { get; set; }
+    [Parameter] public IReadOnlyList<ProjectOption> ProjectOptions { get; set; } = Array.Empty<ProjectOption>();
+    [Parameter] public string EmptyMessage { get; set; } = DocumentMessages.EmptyDefault;
+
+    private int TotalPages => Items == null || Items.PageSize <= 0
+        ? 1
+        : Math.Max(1, (int)Math.Ceiling(Items.TotalCount / (double)Items.PageSize));
+
+    private async Task GoToPageAsync(int page)
+    {
+        if (Items == null || page < 1 || page > TotalPages)
+        {
+            return;
+        }
+
+        var next = new DocumentQuery
+        {
+            Category = Query.Category,
+            ProjectId = Query.ProjectId,
+            FromDate = Query.FromDate,
+            ToDate = Query.ToDate,
+            Department = Query.Department,
+            SortBy = Query.SortBy,
+            Descending = Query.Descending,
+            PageSize = Query.PageSize,
+            Page = page
+        };
+
+        await OnQueryChanged.InvokeAsync(next);
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        const double kb = 1024;
+        const double mb = kb * 1024;
+
+        if (bytes >= mb)
+        {
+            return $"{bytes / mb:0.#} MB";
+        }
+
+        if (bytes >= kb)
+        {
+            return $"{bytes / kb:0.#} KB";
+        }
+
+        return $"{bytes} bytes";
+    }
+}

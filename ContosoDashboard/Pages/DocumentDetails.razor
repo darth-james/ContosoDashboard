@@ -1,0 +1,143 @@
+@page "/documents/{DocumentId:int}"
+@using ContosoDashboard.Services
+@using System.Security.Claims
+@attribute [Authorize]
+@inject IDocumentService DocumentService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Document - ContosoDashboard</PageTitle>
+
+<div class="container-fluid">
+    <div class="mb-3">
+        <a href="/documents" class="btn btn-link ps-0"><span class="bi bi-arrow-left" aria-hidden="true"></span> My Documents</a>
+    </div>
+
+    @if (loading)
+    {
+        <p><em>Loading…</em></p>
+    }
+    else if (details == null)
+    {
+        <div class="alert alert-warning" role="alert">@DocumentMessages.NotFound</div>
+    }
+    else
+    {
+        <div class="row mb-3">
+            <div class="col">
+                <h1>@details.Summary.Title</h1>
+            </div>
+            <div class="col-auto">
+                @* A plain link with the download attribute stops the Blazor router from intercepting it. *@
+                <a class="btn btn-primary" href="/documents/@details.Summary.DocumentId/download" download>
+                    <span class="bi bi-download" aria-hidden="true"></span> Download
+                </a>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Category</dt>
+                    <dd class="col-sm-9">@details.Summary.Category</dd>
+
+                    <dt class="col-sm-3">Description</dt>
+                    <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(details.Description) ? "—" : details.Description)</dd>
+
+                    <dt class="col-sm-3">Tags</dt>
+                    <dd class="col-sm-9">
+                        @if (details.Tags.Count == 0)
+                        {
+                            <span>—</span>
+                        }
+                        else
+                        {
+                            @foreach (var tag in details.Tags)
+                            {
+                                <span class="badge bg-secondary me-1">@tag</span>
+                            }
+                        }
+                    </dd>
+
+                    <dt class="col-sm-3">Project</dt>
+                    <dd class="col-sm-9">@(details.Summary.ProjectName ?? "—")</dd>
+
+                    <dt class="col-sm-3">Uploaded by</dt>
+                    <dd class="col-sm-9">@details.Summary.UploadedByName</dd>
+
+                    <dt class="col-sm-3">Uploaded (UTC)</dt>
+                    <dd class="col-sm-9">@details.Summary.UploadedDate.ToString("MMM dd, yyyy HH:mm")</dd>
+
+                    <dt class="col-sm-3">Last modified (UTC)</dt>
+                    <dd class="col-sm-9">@details.LastModifiedDate.ToString("MMM dd, yyyy HH:mm")</dd>
+
+                    <dt class="col-sm-3">File name</dt>
+                    <dd class="col-sm-9">@details.OriginalFileName</dd>
+
+                    <dt class="col-sm-3">Size</dt>
+                    <dd class="col-sm-9">@FormatSize(details.Summary.FileSizeBytes)</dd>
+
+                    <dt class="col-sm-3">Type</dt>
+                    <dd class="col-sm-9">@DocumentFileRules.GetDisplayName(details.Summary.FileType) (@details.Summary.FileType)</dd>
+                </dl>
+            </div>
+        </div>
+
+        @* Placeholder sections for the actions that later stories add, gated by the Can* flags. *@
+        @if (details.CanEditMetadata)
+        {
+            <!-- US4: edit metadata -->
+        }
+        @if (details.CanReplaceFile)
+        {
+            <!-- US4: replace file -->
+        }
+        @if (details.CanDelete)
+        {
+            <!-- US4: delete (confirm) -->
+        }
+        @if (details.CanShare)
+        {
+            <!-- US5: shares -->
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public int DocumentId { get; set; }
+
+    private ContosoDashboard.Services.DocumentDetails? details;
+    private bool loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        details = null;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+        {
+            details = await DocumentService.GetDocumentAsync(DocumentId, userId);
+        }
+
+        loading = false;
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        const double kb = 1024;
+        const double mb = kb * 1024;
+
+        if (bytes >= mb)
+        {
+            return $"{bytes / mb:0.#} MB";
+        }
+
+        if (bytes >= kb)
+        {
+            return $"{bytes / kb:0.#} KB";
+        }
+
+        return $"{bytes} bytes";
+    }
+}

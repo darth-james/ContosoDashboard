@@ -10,6 +10,7 @@ public interface INotificationService
     Task<Notification> CreateNotificationAsync(Notification notification);
     Task<bool> MarkAsReadAsync(int notificationId, int requestingUserId);
     Task<int> GetUnreadCountAsync(int userId);
+    Task<int> CreateNotificationsAsync(IEnumerable<Notification> notifications);
 }
 
 public class NotificationService : INotificationService
@@ -68,5 +69,43 @@ public class NotificationService : INotificationService
     {
         return await _context.Notifications
             .CountAsync(n => n.UserId == userId && !n.IsRead);
+    }
+
+    // Batch insert for document notifications (R-12): one query for the recipients' in-app preference,
+    // one SaveChangesAsync(). Recipients with in-app notifications disabled (or unknown users) are skipped.
+    public async Task<int> CreateNotificationsAsync(IEnumerable<Notification> notifications)
+    {
+        ArgumentNullException.ThrowIfNull(notifications);
+
+        var pending = notifications.ToList();
+        if (pending.Count == 0)
+        {
+            return 0;
+        }
+
+        var recipientIds = pending.Select(n => n.UserId).Distinct().ToList();
+        var enabledRecipients = (await _context.Users
+                .Where(u => recipientIds.Contains(u.UserId) && u.InAppNotificationsEnabled)
+                .Select(u => u.UserId)
+                .ToListAsync())
+            .ToHashSet();
+
+        var toInsert = pending.Where(n => enabledRecipients.Contains(n.UserId)).ToList();
+        if (toInsert.Count == 0)
+        {
+            return 0;
+        }
+
+        var now = DateTime.UtcNow;
+        foreach (var notification in toInsert)
+        {
+            notification.CreatedDate = now;
+            notification.IsRead = false;
+        }
+
+        _context.Notifications.AddRange(toInsert);
+        await _context.SaveChangesAsync();
+
+        return toInsert.Count;
     }
 }
